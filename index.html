@@ -837,7 +837,70 @@
 
   .footer-copy { font-size: 0.7rem; color: rgba(255,255,255,0.2); font-weight: 300; }
 
-  /* ── ANIMATIONS ── */
+  /* ── BLOG ── */
+  .blog-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: border-color 0.3s, transform 0.3s;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .blog-card:hover { border-color: rgba(201,168,76,0.35); transform: translateY(-4px); }
+  .blog-card-img {
+    aspect-ratio: 16/9; overflow: hidden;
+    background: linear-gradient(135deg, #0A1E38, #0e2a4a);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .blog-card-img img { width:100%; height:100%; object-fit:cover; transition: transform 0.5s; }
+  .blog-card:hover .blog-card-img img { transform: scale(1.05); }
+  .blog-card-body { padding: 1.5rem; }
+  .blog-card-cat {
+    font-size: 0.6rem; letter-spacing: 0.25em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 0.6rem;
+  }
+  .blog-card-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.25rem; color: var(--white); font-weight: 300;
+    line-height: 1.35; margin-bottom: 0.6rem;
+  }
+  .blog-card-excerpt {
+    font-size: 0.8rem; color: rgba(255,255,255,0.45);
+    line-height: 1.7; font-weight: 300; margin-bottom: 1rem;
+  }
+  .blog-card-date { font-size: 0.65rem; color: var(--text-muted); letter-spacing: 0.08em; }
+
+  /* contenteditable placeholder */
+  #blogContent:empty:before {
+    content: attr(data-placeholder);
+    color: rgba(255,255,255,0.2);
+    pointer-events: none;
+    display: block;
+  }
+  #blogContent img { max-width: 100%; height: auto; margin: 0.8rem 0; display: block; }
+
+  /* gallery admin cards */
+  .admin-gallery-card {
+    position: relative; aspect-ratio: 1; overflow: hidden;
+    background: #0A1E38; cursor: default;
+  }
+  .admin-gallery-card img { width:100%; height:100%; object-fit:cover; }
+  .admin-gallery-actions {
+    position: absolute; inset:0; background: rgba(4,44,83,0.85);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.5rem; opacity:0; transition: opacity 0.2s;
+  }
+  .admin-gallery-card:hover .admin-gallery-actions { opacity:1; }
+
+  @media (max-width: 900px) {
+    #blogGrid { grid-template-columns: repeat(2,1fr) !important; }
+    #adminGalleryGrid { grid-template-columns: repeat(3,1fr) !important; }
+  }
+  @media (max-width: 600px) {
+    #blogGrid { grid-template-columns: 1fr !important; }
+    #adminGalleryGrid { grid-template-columns: repeat(2,1fr) !important; }
+  }
+
+
   @keyframes fadeDown {
     from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
@@ -886,6 +949,7 @@
     <li><a href="#" onclick="showPage('gallery')">Galerie</a></li>
     <li><a href="#" onclick="showPage('pricing')">Tarifs</a></li>
     <li><a href="#" onclick="showPage('testimonials')">Témoignages</a></li>
+    <li><a href="#" onclick="showPage('blog')">Blog</a></li>
     <li><a href="#" onclick="showPage('contact')">Contact</a></li>
     <li><a href="#" class="nav-cta" onclick="showPage('pricing')">Commander</a></li>
     <li><a href="#" onclick="showPage('admin')" style="opacity:0.3; font-size:0.6rem;">⚙</a></li>
@@ -935,27 +999,8 @@
         <h2 class="section-title light">La Galerie</h2>
         <div class="divider-gold center"></div>
       </div>
-      <div class="gallery-grid">
-        <div class="gallery-item" onclick="openLightbox(0)">
-          <img src="IMG-20260309-WA0010.jpg" alt="Portrait réaliste au stylo à bille par Élirïs'Art">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait Réaliste • Stylo à Bille</div></div>
-        </div>
-        <div class="gallery-item" onclick="openLightbox(2)">
-          <img src="IMG-20260309-WA0014.jpg" alt="Portrait femme au stylo à bille">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait • Stylo à Bille</div></div>
-        </div>
-        <div class="gallery-item" onclick="openLightbox(3)">
-          <img src="IMG-20260309-WA0016.jpg" alt="Portrait réaliste">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait Réaliste</div></div>
-        </div>
-        <div class="gallery-item" onclick="openLightbox(5)">
-          <img src="IMG-20260405-WA0039.jpg" alt="Portrait homme souriant">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait Homme • Stylo à Bille</div></div>
-        </div>
-        <div class="gallery-item" onclick="openLightbox(7)">
-          <img src="IMG-20260405-WA0043.jpg" alt="Portrait femme foulard">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait Format A3</div></div>
-        </div>
+      <div class="gallery-grid" id="homeGalleryGrid">
+        <!-- Populated by JS -->
       </div>
       <div style="text-align:center; margin-top:2.5rem;">
         <a href="#" class="btn-outline" onclick="showPage('gallery')">Voir toute la Galerie</a>
@@ -1034,7 +1079,7 @@
 </div><!-- /page-about -->
 
 
-<!-- ════════════════ PAGE: GALLERY ════════════════ -->
+<!-- ════════════════ PAGE: GALLERY (DYNAMIC) ════════════════ -->
 <div id="page-gallery" class="page">
   <section class="section section-blue" style="padding-top:5rem;">
     <div class="container">
@@ -1045,69 +1090,9 @@
         <p style="font-size:0.9rem; color:rgba(255,255,255,0.5); margin-top:1rem; font-weight:300; max-width:500px; margin-left:auto; margin-right:auto; line-height:1.8;">Chaque portrait est une œuvre unique, réalisée au stylo à bille avec une précision et une dévotion absolues.</p>
       </div>
 
-      <!-- FULL GALLERY 12 items -->
-      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">
-
-        <div class="gallery-item" style="aspect-ratio:0.75; grid-column:span 2; grid-row:span 2;" onclick="openLightbox(0)">
-          <img src="IMG-20260309-WA0010.jpg" alt="Portrait femme aux cheveux bouclés — Élirïs'Art" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait Réaliste • Cheveux Bouclés</div></div>
-        </div>
-
-        <div class="gallery-item" style="aspect-ratio:1;" onclick="openLightbox(1)">
-          <img src="IMG-20260309-WA0013.jpg" alt="Détail œil au stylo à bille" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Étude d'Œil • Stylo à Bille</div></div>
-        </div>
-
-        <div class="gallery-item" style="aspect-ratio:1;" onclick="openLightbox(2)">
-          <img src="IMG-20260309-WA0014.jpg" alt="Portrait femme cheveux frisés" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait • Cheveux Naturels</div></div>
-        </div>
-
-        <div class="gallery-item" style="aspect-ratio:0.8;" onclick="openLightbox(3)">
-          <img src="IMG-20260309-WA0016.jpg" alt="Portrait réaliste crayon" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait Réaliste • Tresses</div></div>
-        </div>
-
-        <div class="gallery-item" style="aspect-ratio:0.75;" onclick="openLightbox(4)">
-          <img src="IMG-20260309-WA0017.jpg" alt="Portrait femme tresses bleues" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait • Tresses Cornrows</div></div>
-        </div>
-
-        <div class="gallery-item" style="aspect-ratio:0.8; grid-column:span 2;" onclick="openLightbox(5)">
-          <img src="IMG-20260405-WA0039.jpg" alt="Portrait homme souriant" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait Homme • Expression Joyeuse</div></div>
-        </div>
-
-        <div class="gallery-item" style="aspect-ratio:1.3; grid-column:span 2;" onclick="openLightbox(6)">
-          <img src="IMG-20260405-WA0041.jpg" alt="Portrait posé sur table en bois" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait en Contexte • Format A3</div></div>
-        </div>
-
-        <div class="gallery-item" style="aspect-ratio:0.75; grid-column:span 2;" onclick="openLightbox(7)">
-          <img src="IMG-20260405-WA0043.jpg" alt="Portrait femme foulard souriant" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait • Joie et Élégance</div></div>
-        </div>
-
-        <div class="gallery-item" style="aspect-ratio:0.75;" onclick="openLightbox(8)">
-          <img src="IMG-20260428-WA0020.jpg" alt="Portrait femme lunettes de soleil" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait • Lunettes & Sourire</div></div>
-        </div>
-
-        <div class="gallery-item" style="aspect-ratio:0.75;" onclick="openLightbox(9)">
-          <img src="IMG-20260520-WA0011.jpg" alt="Portrait femme pensive main sous menton" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait • Méditation</div></div>
-        </div>
-
-        <div class="gallery-item" style="aspect-ratio:0.75;" onclick="openLightbox(10)">
-          <img src="IMG-20260520-WA0014.jpg" alt="Portrait femme tresses cornrows stylo visible" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait • Avec l'Outil du Maître</div></div>
-        </div>
-
-        <div class="gallery-item" style="aspect-ratio:0.6; grid-column:span 1;" onclick="openLightbox(11)">
-          <img src="IMG-20260521-WA0017.jpg" alt="Portrait corps entier femme en jean" style="width:100%;height:100%;object-fit:cover;object-position:top;transition:transform 0.6s ease;">
-          <div class="gallery-overlay"><div class="gallery-overlay-text">Portrait Corps Entier • A2</div></div>
-        </div>
-
+      <!-- DYNAMIC GALLERY GRID -->
+      <div id="galleryGrid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:6px;">
+        <!-- Rendered by JS -->
       </div>
 
       <div style="text-align:center; margin-top:3rem;">
@@ -1410,13 +1395,147 @@
             </table>
           </div>
         </div>
-      </div>
+
+        <!-- ═══════════════ GALLERY MANAGER ═══════════════ -->
+        <div style="margin-top:3rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+            <div>
+              <div class="section-label">Gérer la Galerie</div>
+              <h3 style="font-family:'Cormorant Garamond',serif; font-size:1.8rem; color:var(--white); font-weight:300;">Photos & Œuvres</h3>
+            </div>
+          </div>
+
+          <!-- UPLOAD ZONE -->
+          <div id="galleryDropZone" style="border:2px dashed rgba(201,168,76,0.3); background:rgba(255,255,255,0.02); padding:3rem 2rem; text-align:center; cursor:pointer; transition:all 0.3s; margin-bottom:2rem; position:relative;"
+            onclick="document.getElementById('galleryFileInput').click()"
+            ondragover="event.preventDefault(); this.style.borderColor='var(--gold)'; this.style.background='rgba(201,168,76,0.06)'"
+            ondragleave="this.style.borderColor='rgba(201,168,76,0.3)'; this.style.background='rgba(255,255,255,0.02)'"
+            ondrop="handleGalleryDrop(event)">
+            <div style="font-size:2.5rem; color:rgba(201,168,76,0.4); margin-bottom:0.8rem;">⬆</div>
+            <div style="font-family:'Cormorant Garamond',serif; font-size:1.3rem; color:var(--white); margin-bottom:0.4rem;">Glissez vos images ici</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">ou cliquez pour sélectionner • JPG, PNG, WEBP • Max 5 MB/image</div>
+            <input type="file" id="galleryFileInput" accept="image/*" multiple style="display:none" onchange="handleGalleryFiles(this.files)">
+          </div>
+
+          <!-- GALLERY ADMIN GRID -->
+          <div id="adminGalleryGrid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:1rem;">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- ═══════════════ BLOG MANAGER ═══════════════ -->
+        <div style="margin-top:3rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+            <div>
+              <div class="section-label">Gérer le Blog</div>
+              <h3 style="font-family:'Cormorant Garamond',serif; font-size:1.8rem; color:var(--white); font-weight:300;">Articles & Publications</h3>
+            </div>
+            <button onclick="openBlogEditor()" style="background:var(--gold); border:none; color:var(--blue-deep); font-family:'Josefin Sans',sans-serif; font-size:0.7rem; font-weight:600; padding:0.7rem 1.6rem; cursor:pointer; letter-spacing:0.15em; text-transform:uppercase;">+ Nouvel Article</button>
+          </div>
+
+          <!-- BLOG EDITOR -->
+          <div id="blogEditor" style="display:none; background:#0A1628; border:1px solid rgba(201,168,76,0.2); padding:2.5rem; margin-bottom:2rem;">
+            <h4 style="font-family:'Cormorant Garamond',serif; font-size:1.4rem; color:var(--white); margin-bottom:1.5rem; font-weight:300;" id="blogEditorTitle">Nouvel Article</h4>
+            <input type="hidden" id="blogEditId">
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Titre de l'article *</label>
+              <input type="text" id="blogTitle" class="form-input-dark" placeholder="Ex: Le secret du stylo à bille...">
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Résumé (affiché sur la carte)</label>
+              <input type="text" id="blogExcerpt" class="form-input-dark" placeholder="Une courte description pour attirer les lecteurs...">
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Catégorie</label>
+              <select id="blogCategory" class="form-input-dark" style="cursor:pointer;">
+                <option value="Technique">Technique</option>
+                <option value="Coulisses">Coulisses</option>
+                <option value="Inspiration">Inspiration</option>
+                <option value="Portrait">Portrait</option>
+                <option value="Actualité">Actualité</option>
+              </select>
+            </div>
+
+            <div style="margin-bottom:1rem;">
+              <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Image de couverture</label>
+              <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+                <div id="blogCoverPreview" style="width:120px; height:80px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
+                  <span style="font-size:0.7rem; color:rgba(255,255,255,0.2);">Aucune image</span>
+                </div>
+                <div>
+                  <button onclick="document.getElementById('blogCoverInput').click()" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.6); font-family:'Josefin Sans',sans-serif; font-size:0.68rem; padding:0.6rem 1.2rem; cursor:pointer; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:0.5rem; display:block;">📷 Choisir une image</button>
+                  <input type="file" id="blogCoverInput" accept="image/*" style="display:none" onchange="handleBlogCover(this)">
+                  <div style="font-size:0.68rem; color:var(--text-muted);">JPG, PNG ou WEBP · Max 3 MB</div>
+                </div>
+              </div>
+              <input type="hidden" id="blogCoverData">
+            </div>
+
+            <div style="margin-bottom:1.5rem;">
+              <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Contenu de l'article *</label>
+              <div style="border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.02);">
+                <div id="blogToolbar" style="display:flex; gap:0.3rem; padding:0.6rem; border-bottom:1px solid rgba(255,255,255,0.08); flex-wrap:wrap;">
+                  <button onclick="blogFormat('bold')" title="Gras" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.7); width:30px; height:30px; cursor:pointer; font-weight:700; font-size:0.85rem;">B</button>
+                  <button onclick="blogFormat('italic')" title="Italique" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.7); width:30px; height:30px; cursor:pointer; font-style:italic; font-size:0.85rem;">I</button>
+                  <button onclick="blogFormat('underline')" title="Souligné" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.7); width:30px; height:30px; cursor:pointer; text-decoration:underline; font-size:0.85rem;">U</button>
+                  <div style="width:1px; background:rgba(255,255,255,0.1); margin:0 0.2rem;"></div>
+                  <button onclick="blogFormat('insertUnorderedList')" title="Liste" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.7); width:30px; height:30px; cursor:pointer; font-size:0.85rem;">≡</button>
+                  <button onclick="blogInsertHeading()" title="Sous-titre" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.7); padding:0 8px; height:30px; cursor:pointer; font-size:0.72rem; letter-spacing:0.05em; white-space:nowrap;">H2</button>
+                  <div style="width:1px; background:rgba(255,255,255,0.1); margin:0 0.2rem;"></div>
+                  <button onclick="document.getElementById('blogInlineImgInput').click()" title="Insérer image" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.7); padding:0 10px; height:30px; cursor:pointer; font-size:0.75rem; letter-spacing:0.05em; white-space:nowrap;">🖼 Image</button>
+                  <input type="file" id="blogInlineImgInput" accept="image/*" style="display:none" onchange="handleBlogInlineImage(this)">
+                </div>
+                <div id="blogContent" contenteditable="true" style="min-height:200px; padding:1rem; color:rgba(255,255,255,0.8); font-size:0.9rem; line-height:1.8; outline:none; font-family:'Josefin Sans',sans-serif;" data-placeholder="Rédigez votre article ici..."></div>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+              <button onclick="saveBlogPost()" style="background:var(--gold); border:none; color:var(--blue-deep); font-family:'Josefin Sans',sans-serif; font-size:0.72rem; font-weight:600; padding:0.8rem 2rem; cursor:pointer; letter-spacing:0.15em; text-transform:uppercase;">💾 Publier l'Article</button>
+              <button onclick="cancelBlogEditor()" style="background:none; border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.5); font-family:'Josefin Sans',sans-serif; font-size:0.72rem; padding:0.8rem 1.5rem; cursor:pointer; letter-spacing:0.12em; text-transform:uppercase;">Annuler</button>
+            </div>
+          </div>
+
+        </div><!-- /adminBlogList -->
+      </div><!-- /blog manager -->
+    </div><!-- /container -->
     </section>
-  </div>
+  </div><!-- /adminDashboard -->
 </div><!-- /page-admin -->
 
 
-<!-- ════════════════ RECEIPT MODAL ════════════════ -->
+<!-- ════════════════ PAGE: BLOG ════════════════ -->
+<div id="page-blog" class="page">
+  <section class="section section-blue" style="padding-top:5rem;">
+    <div class="container">
+      <div style="text-align:center; margin-bottom:3rem;">
+        <div class="section-label">Journal d'Artiste</div>
+        <h2 class="section-title light">Le Blog</h2>
+        <div class="divider-gold center"></div>
+        <p style="font-size:0.9rem; color:rgba(255,255,255,0.5); margin-top:1rem; font-weight:300; max-width:500px; margin-left:auto; margin-right:auto; line-height:1.8;">Découvrez les coulisses de l'atelier, les techniques et l'univers d'Élirïs'Art.</p>
+      </div>
+      <div id="blogGrid" style="display:grid; grid-template-columns:repeat(3,1fr); gap:2rem;">
+        <!-- Populated by JS -->
+      </div>
+      <div id="blogEmpty" style="display:none; text-align:center; padding:5rem 2rem;">
+        <div style="font-size:3rem; opacity:0.15; margin-bottom:1rem;">✦</div>
+        <p style="font-size:0.9rem; color:rgba(255,255,255,0.3); font-style:italic;">Aucun article pour le moment. Revenez bientôt !</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- BLOG POST MODAL -->
+  <div id="blogPostModal" style="display:none; position:fixed; inset:0; z-index:3500; background:rgba(2,8,20,0.97); backdrop-filter:blur(16px); overflow-y:auto; padding:2rem;">
+    <div style="max-width:800px; margin:auto; position:relative;">
+      <button onclick="closeBlogPost()" style="position:sticky; top:1rem; float:right; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.5); width:42px; height:42px; font-size:1.3rem; cursor:pointer; line-height:1;">✕</button>
+      <div id="blogPostContent" style="clear:both; padding-top:1rem;"></div>
+    </div>
+  </div>
+</div><!-- /page-blog -->
+
+
 <div id="receiptModal" style="display:none; position:fixed; inset:0; z-index:3000; background:rgba(2,14,31,0.95); backdrop-filter:blur(10px); align-items:center; justify-content:center; padding:1.5rem; overflow-y:auto;">
   <div style="background:var(--white); max-width:620px; width:100%; margin:auto; position:relative; animation:modalIn 0.4s cubic-bezier(0.16,1,0.3,1);">
 
@@ -1551,6 +1670,7 @@
     <a href="#" onclick="showPage('gallery')">Galerie</a>
     <a href="#" onclick="showPage('pricing')">Tarifs</a>
     <a href="#" onclick="showPage('testimonials')">Témoignages</a>
+    <a href="#" onclick="showPage('blog')">Blog</a>
     <a href="#" onclick="showPage('contact')">Contact</a>
   </div>
   <div class="footer-copy">© 2026 Élirïs'Art — Élie LEKU. Tous droits réservés. Goma, RDC.</div>
@@ -1580,6 +1700,8 @@ function checkAdmin() {
     document.getElementById('adminDashboard').style.display = 'block';
     renderLogs();
     renderAdminStats();
+    renderAdminGallery();
+    renderAdminBlogList();
   } else {
     document.getElementById('adminError').style.display = 'block';
     document.getElementById('adminPwd').value = '';
@@ -1770,9 +1892,341 @@ function exportLogs() {
   a.click();
 }
 
+
 // ══════════════════════════════════════
-// RECEIPT MODAL
+// STATIC GALLERY IMAGES (fallback/default)
 // ══════════════════════════════════════
+const staticGalleryImages = [
+  { src: 'IMG-20260309-WA0010.jpg', caption: 'Portrait Réaliste • Cheveux Bouclés — Stylo à Bille' },
+  { src: 'IMG-20260309-WA0013.jpg', caption: 'Étude d\'Œil • Précision Extrême au Stylo à Bille' },
+  { src: 'IMG-20260309-WA0014.jpg', caption: 'Portrait • Cheveux Naturels Frisés' },
+  { src: 'IMG-20260309-WA0016.jpg', caption: 'Portrait Réaliste • Tresses Africaines' },
+  { src: 'IMG-20260309-WA0017.jpg', caption: 'Portrait • Tresses Cornrows — Élirïs\'Art' },
+  { src: 'IMG-20260405-WA0039.jpg', caption: 'Portrait Homme • Expression Joyeuse et Naturelle' },
+  { src: 'IMG-20260405-WA0041.jpg', caption: 'Portrait en Contexte • Format A3' },
+  { src: 'IMG-20260405-WA0043.jpg', caption: 'Portrait • Joie et Élégance au Foulard' },
+  { src: 'IMG-20260428-WA0020.jpg', caption: 'Portrait • Lunettes de Soleil & Sourire Lumineux' },
+  { src: 'IMG-20260520-WA0011.jpg', caption: 'Portrait • Méditation et Sérénité' },
+  { src: 'IMG-20260520-WA0014.jpg', caption: 'Portrait • Avec l\'Outil du Maître, le Stylo à Bille' },
+  { src: 'IMG-20260521-WA0017.jpg', caption: 'Portrait Corps Entier • Maîtrise du Détail — A2' },
+];
+
+// ══════════════════════════════════════
+// DYNAMIC GALLERY (localStorage)
+// ══════════════════════════════════════
+function getGalleryItems() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('elirisart_gallery') || '[]');
+    return [...staticGalleryImages, ...stored];
+  } catch { return staticGalleryImages; }
+}
+
+function getExtraGalleryItems() {
+  try { return JSON.parse(localStorage.getItem('elirisart_gallery') || '[]'); } catch { return []; }
+}
+
+function saveGalleryItem(item) {
+  const items = getExtraGalleryItems();
+  items.unshift(item);
+  localStorage.setItem('elirisart_gallery', JSON.stringify(items));
+}
+
+function deleteGalleryItem(id) {
+  const items = getExtraGalleryItems().filter(i => i.id !== id);
+  localStorage.setItem('elirisart_gallery', JSON.stringify(items));
+  renderGalleryPage();
+  renderHomeGallery();
+  renderAdminGallery();
+}
+
+function renderGalleryPage() {
+  const all = getGalleryItems();
+  // Update lightbox data
+  galleryImages.length = 0;
+  all.forEach(i => galleryImages.push({ src: i.src, caption: i.caption }));
+
+  const grid = document.getElementById('galleryGrid');
+  if (!grid) return;
+
+  const layouts = [
+    'grid-column:span 2; grid-row:span 2; aspect-ratio:0.75',
+    'aspect-ratio:1',
+    'aspect-ratio:1',
+    'aspect-ratio:0.8',
+    'aspect-ratio:0.75',
+    'grid-column:span 2; aspect-ratio:0.8',
+    'grid-column:span 2; aspect-ratio:1.3',
+    'grid-column:span 2; aspect-ratio:0.75',
+    'aspect-ratio:0.75',
+    'aspect-ratio:0.75',
+    'aspect-ratio:0.75',
+    'aspect-ratio:0.6',
+  ];
+
+  grid.innerHTML = all.map((item, idx) => {
+    const style = layouts[idx] || 'aspect-ratio:1';
+    const short = item.caption.split(' — ')[0].split(' • ')[0];
+    return `
+      <div class="gallery-item" style="${style};" onclick="openLightbox(${idx})">
+        <img src="${item.src}" alt="${item.caption}" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
+        <div class="gallery-overlay"><div class="gallery-overlay-text">${short}</div></div>
+      </div>`;
+  }).join('');
+}
+
+function renderHomeGallery() {
+  const all = getGalleryItems();
+  const preview = all.slice(0, 5);
+  const grid = document.getElementById('homeGalleryGrid');
+  if (!grid) return;
+  grid.innerHTML = preview.map((item, idx) => `
+    <div class="gallery-item" onclick="openLightbox(${idx})">
+      <img src="${item.src}" alt="${item.caption}" style="width:100%;height:100%;object-fit:cover;">
+      <div class="gallery-overlay"><div class="gallery-overlay-text">${item.caption.split(' — ')[0]}</div></div>
+    </div>`).join('');
+}
+
+function renderAdminGallery() {
+  const extra = getExtraGalleryItems();
+  const grid = document.getElementById('adminGalleryGrid');
+  if (!grid) return;
+  if (extra.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:2rem; color:rgba(255,255,255,0.25); font-size:0.8rem; font-style:italic; border:1px dashed rgba(255,255,255,0.08);">Aucune image ajoutée via l\'admin. Les images ci-dessus sont les photos d\'origine.</div>';
+    return;
+  }
+  grid.innerHTML = extra.map(item => `
+    <div class="admin-gallery-card">
+      <img src="${item.src}" alt="${item.caption}">
+      <div class="admin-gallery-actions">
+        <div style="font-size:0.72rem; color:rgba(255,255,255,0.7); text-align:center; padding:0 0.5rem; margin-bottom:0.5rem; line-height:1.4;">${item.caption}</div>
+        <button onclick="deleteGalleryItem('${item.id}')" style="background:#c0392b; border:none; color:white; font-family:'Josefin Sans',sans-serif; font-size:0.62rem; padding:0.4rem 0.9rem; cursor:pointer; letter-spacing:0.1em; text-transform:uppercase;">🗑 Supprimer</button>
+      </div>
+    </div>`).join('');
+}
+
+function handleGalleryDrop(event) {
+  event.preventDefault();
+  const zone = document.getElementById('galleryDropZone');
+  zone.style.borderColor = 'rgba(201,168,76,0.3)';
+  zone.style.background = 'rgba(255,255,255,0.02)';
+  handleGalleryFiles(event.dataTransfer.files);
+}
+
+function handleGalleryFiles(files) {
+  Array.from(files).forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 5 * 1024 * 1024) { alert(`${file.name} dépasse 5 MB, ignoré.`); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const caption = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+      const item = { id: Date.now() + Math.random(), src: e.target.result, caption };
+      saveGalleryItem(item);
+      renderGalleryPage();
+      renderHomeGallery();
+      renderAdminGallery();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ══════════════════════════════════════
+// BLOG SYSTEM
+// ══════════════════════════════════════
+function getBlogPosts() {
+  try { return JSON.parse(localStorage.getItem('elirisart_blog') || '[]'); } catch { return []; }
+}
+
+function saveBlogPosts(posts) {
+  localStorage.setItem('elirisart_blog', JSON.stringify(posts));
+}
+
+function renderBlogPage() {
+  const posts = getBlogPosts();
+  const grid = document.getElementById('blogGrid');
+  const empty = document.getElementById('blogEmpty');
+  if (!grid) return;
+  if (posts.length === 0) {
+    grid.style.display = 'none';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  grid.style.display = 'grid';
+  if (empty) empty.style.display = 'none';
+  grid.innerHTML = posts.map(post => `
+    <div class="blog-card" onclick="openBlogPost('${post.id}')">
+      <div class="blog-card-img">
+        ${post.cover ? `<img src="${post.cover}" alt="${post.title}">` : `<div style="font-size:3rem; color:rgba(201,168,76,0.2);">✦</div>`}
+      </div>
+      <div class="blog-card-body">
+        <div class="blog-card-cat">${post.category || 'Article'}</div>
+        <div class="blog-card-title">${post.title}</div>
+        <div class="blog-card-excerpt">${post.excerpt || ''}</div>
+        <div class="blog-card-date">${post.date}</div>
+      </div>
+    </div>`).join('');
+}
+
+function openBlogPost(id) {
+  const posts = getBlogPosts();
+  const post = posts.find(p => p.id === id);
+  if (!post) return;
+  const modal = document.getElementById('blogPostModal');
+  const content = document.getElementById('blogPostContent');
+  content.innerHTML = `
+    ${post.cover ? `<img src="${post.cover}" alt="${post.title}" style="width:100%; max-height:400px; object-fit:cover; margin-bottom:2rem;">` : ''}
+    <div style="font-size:0.65rem; letter-spacing:0.25em; text-transform:uppercase; color:var(--gold); margin-bottom:0.8rem;">${post.category || 'Article'}</div>
+    <h1 style="font-family:'Cormorant Garamond',serif; font-size:clamp(2rem,4vw,3rem); color:var(--white); font-weight:300; line-height:1.15; margin-bottom:0.5rem;">${post.title}</h1>
+    <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:2rem; padding-bottom:1.5rem; border-bottom:1px solid rgba(255,255,255,0.07);">${post.date} — Élie LEKU</div>
+    <div style="font-size:0.95rem; color:rgba(255,255,255,0.75); line-height:1.9; font-weight:300;">${post.content}</div>
+    <div style="margin-top:3rem; padding-top:1.5rem; border-top:1px solid rgba(255,255,255,0.08); text-align:center;">
+      <a href="#" class="btn-gold" style="font-size:0.7rem;" onclick="closeBlogPost(); showPage('pricing')">Commander un Portrait</a>
+    </div>`;
+  modal.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeBlogPost() {
+  document.getElementById('blogPostModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function renderAdminBlogList() {
+  const posts = getBlogPosts();
+  const list = document.getElementById('adminBlogList');
+  if (!list) return;
+  if (posts.length === 0) {
+    list.innerHTML = '<div style="text-align:center; padding:2rem; color:rgba(255,255,255,0.2); font-style:italic; font-size:0.85rem; border:1px dashed rgba(255,255,255,0.07);">Aucun article publié.</div>';
+    return;
+  }
+  list.innerHTML = posts.map(post => `
+    <div style="background:#0A1628; border:1px solid rgba(255,255,255,0.07); padding:1.2rem 1.5rem; display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:0.6rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:0.3rem;">${post.category} · ${post.date}</div>
+        <div style="font-family:'Cormorant Garamond',serif; font-size:1.15rem; color:var(--white); font-weight:300; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${post.title}</div>
+      </div>
+      <div style="display:flex; gap:0.6rem; flex-shrink:0;">
+        <button onclick="editBlogPost('${post.id}')" style="background:rgba(55,138,221,0.15); border:1px solid rgba(55,138,221,0.3); color:var(--blue-light); font-family:'Josefin Sans',sans-serif; font-size:0.62rem; padding:0.4rem 0.9rem; cursor:pointer; letter-spacing:0.1em; text-transform:uppercase;">✏ Modifier</button>
+        <button onclick="deleteBlogPost('${post.id}')" style="background:rgba(192,57,43,0.12); border:1px solid rgba(192,57,43,0.3); color:#e74c3c; font-family:'Josefin Sans',sans-serif; font-size:0.62rem; padding:0.4rem 0.9rem; cursor:pointer; letter-spacing:0.1em; text-transform:uppercase;">🗑 Supprimer</button>
+      </div>
+    </div>`).join('');
+}
+
+function openBlogEditor() {
+  document.getElementById('blogEditor').style.display = 'block';
+  document.getElementById('blogEditorTitle').textContent = 'Nouvel Article';
+  document.getElementById('blogEditId').value = '';
+  document.getElementById('blogTitle').value = '';
+  document.getElementById('blogExcerpt').value = '';
+  document.getElementById('blogCategory').value = 'Technique';
+  document.getElementById('blogContent').innerHTML = '';
+  document.getElementById('blogCoverData').value = '';
+  document.getElementById('blogCoverPreview').innerHTML = '<span style="font-size:0.7rem; color:rgba(255,255,255,0.2);">Aucune image</span>';
+  document.getElementById('blogEditor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelBlogEditor() {
+  document.getElementById('blogEditor').style.display = 'none';
+}
+
+function editBlogPost(id) {
+  const post = getBlogPosts().find(p => p.id === id);
+  if (!post) return;
+  document.getElementById('blogEditor').style.display = 'block';
+  document.getElementById('blogEditorTitle').textContent = 'Modifier l\'Article';
+  document.getElementById('blogEditId').value = post.id;
+  document.getElementById('blogTitle').value = post.title;
+  document.getElementById('blogExcerpt').value = post.excerpt || '';
+  document.getElementById('blogCategory').value = post.category || 'Technique';
+  document.getElementById('blogContent').innerHTML = post.content || '';
+  document.getElementById('blogCoverData').value = post.cover || '';
+  if (post.cover) {
+    document.getElementById('blogCoverPreview').innerHTML = `<img src="${post.cover}" style="width:100%;height:100%;object-fit:cover;">`;
+  }
+  document.getElementById('blogEditor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function deleteBlogPost(id) {
+  if (!confirm('Supprimer cet article ? Action irréversible.')) return;
+  const posts = getBlogPosts().filter(p => p.id !== id);
+  saveBlogPosts(posts);
+  renderBlogPage();
+  renderAdminBlogList();
+}
+
+function saveBlogPost() {
+  const title = document.getElementById('blogTitle').value.trim();
+  const content = document.getElementById('blogContent').innerHTML.trim();
+  if (!title || !content || content === '') { alert('Le titre et le contenu sont obligatoires.'); return; }
+
+  const posts = getBlogPosts();
+  const editId = document.getElementById('blogEditId').value;
+  const now = new Date().toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
+
+  if (editId) {
+    const idx = posts.findIndex(p => p.id === editId);
+    if (idx >= 0) {
+      posts[idx].title = title;
+      posts[idx].excerpt = document.getElementById('blogExcerpt').value.trim();
+      posts[idx].category = document.getElementById('blogCategory').value;
+      posts[idx].content = content;
+      const coverVal = document.getElementById('blogCoverData').value;
+      if (coverVal) posts[idx].cover = coverVal;
+    }
+  } else {
+    posts.unshift({
+      id: 'bp' + Date.now(),
+      title,
+      excerpt: document.getElementById('blogExcerpt').value.trim(),
+      category: document.getElementById('blogCategory').value,
+      cover: document.getElementById('blogCoverData').value || null,
+      content,
+      date: now,
+    });
+  }
+
+  saveBlogPosts(posts);
+  cancelBlogEditor();
+  renderBlogPage();
+  renderAdminBlogList();
+  alert('✅ Article publié avec succès !');
+}
+
+function handleBlogCover(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) { alert('Image trop grande (max 3 MB).'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('blogCoverData').value = e.target.result;
+    document.getElementById('blogCoverPreview').innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleBlogInlineImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) { alert('Image trop grande (max 3 MB).'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('blogContent').focus();
+    document.execCommand('insertHTML', false, `<img src="${e.target.result}" style="max-width:100%;height:auto;margin:0.8rem 0;display:block;">`);
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function blogFormat(cmd) {
+  document.getElementById('blogContent').focus();
+  document.execCommand(cmd, false, null);
+}
+
+function blogInsertHeading() {
+  document.getElementById('blogContent').focus();
+  document.execCommand('formatBlock', false, 'h2');
+}
+
+
 function openReceipt(log) {
   document.getElementById('rcptNumber').textContent = log.orderNum || ('EA-' + log.id);
   document.getElementById('rcptDate').textContent = log.date;
@@ -1872,20 +2326,8 @@ function submitTestimonial() {
 // ══════════════════════════════════════
 // LIGHTBOX
 // ══════════════════════════════════════
-const galleryImages = [
-  { src: 'IMG-20260309-WA0010.jpg', caption: 'Portrait Réaliste • Cheveux Bouclés — Stylo à Bille' },
-  { src: 'IMG-20260309-WA0013.jpg', caption: 'Étude d\'Œil • Précision Extrême au Stylo à Bille' },
-  { src: 'IMG-20260309-WA0014.jpg', caption: 'Portrait • Cheveux Naturels Frisés' },
-  { src: 'IMG-20260309-WA0016.jpg', caption: 'Portrait Réaliste • Tresses Africaines' },
-  { src: 'IMG-20260309-WA0017.jpg', caption: 'Portrait • Tresses Cornrows — Élirïs\'Art' },
-  { src: 'IMG-20260405-WA0039.jpg', caption: 'Portrait Homme • Expression Joyeuse et Naturelle' },
-  { src: 'IMG-20260405-WA0041.jpg', caption: 'Portrait en Contexte • Format A3' },
-  { src: 'IMG-20260405-WA0043.jpg', caption: 'Portrait • Joie et Élégance au Foulard' },
-  { src: 'IMG-20260428-WA0020.jpg', caption: 'Portrait • Lunettes de Soleil & Sourire Lumineux' },
-  { src: 'IMG-20260520-WA0011.jpg', caption: 'Portrait • Méditation et Sérénité' },
-  { src: 'IMG-20260520-WA0014.jpg', caption: 'Portrait • Avec l\'Outil du Maître, le Stylo à Bille' },
-  { src: 'IMG-20260521-WA0017.jpg', caption: 'Portrait Corps Entier • Maîtrise du Détail — A2' },
-];
+// galleryImages is populated dynamically by renderGalleryPage()
+const galleryImages = [];
 
 let lbIndex = 0;
 
@@ -1923,6 +2365,9 @@ function lbNav(dir) {
 // ══════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   renderTestis();
+  renderGalleryPage();
+  renderHomeGallery();
+  renderBlogPage();
   document.getElementById('orderModal').addEventListener('click', function(e) { if(e.target===this) closeOrderModal(); });
   document.getElementById('receiptModal').addEventListener('click', function(e) { if(e.target===this) closeReceipt(); });
   document.getElementById('lightbox').addEventListener('click', function(e) { if(e.target===this) closeLightbox(); });
