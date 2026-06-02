@@ -934,9 +934,112 @@
     .modal { padding: 2rem; }
     .about-portrait { display: none; }
   }
+
+  /* ── HAMBURGER MOBILE MENU ── */
+  .hamburger {
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    z-index: 1100;
+  }
+  .hamburger span {
+    display: block; width: 24px; height: 2px;
+    background: var(--gold); transition: all 0.3s;
+  }
+  .hamburger.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+  .hamburger.open span:nth-child(2) { opacity: 0; }
+  .hamburger.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+  @media (max-width: 600px) {
+    .hamburger { display: flex; }
+  }
+
+  .mobile-menu {
+    display: none;
+    position: fixed;
+    top: 70px; left: 0; right: 0;
+    background: rgba(4,44,83,0.98);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(201,168,76,0.2);
+    z-index: 999;
+    padding: 1rem 0 1.5rem;
+    flex-direction: column;
+  }
+  .mobile-menu.open { display: flex; }
+  .mobile-menu a {
+    display: block; padding: 0.85rem 2rem;
+    color: rgba(255,255,255,0.8); text-decoration: none;
+    font-size: 0.8rem; letter-spacing: 0.18em; text-transform: uppercase;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    transition: color 0.2s, background 0.2s;
+  }
+  .mobile-menu a:hover { color: var(--gold); background: rgba(201,168,76,0.05); }
+  .mobile-menu a.cta-mobile {
+    margin: 1rem 2rem 0;
+    background: var(--gold); color: var(--blue-deep);
+    font-weight: 600; text-align: center; border: none;
+  }
+  .mobile-menu a.admin-mobile {
+    font-size: 0.65rem; opacity: 0.4; padding: 0.5rem 2rem;
+    border: none;
+  }
+
+  /* ── TICKER BANNER ── */
+  #tickerBanner {
+    position: fixed; top: 70px; left: 0; right: 0;
+    z-index: 900;
+    background: var(--gold);
+    color: var(--blue-deep);
+    height: 36px;
+    overflow: hidden;
+    display: none;
+  }
+  #tickerBanner.active { display: block; }
+  .ticker-track {
+    display: flex; align-items: center; height: 100%;
+    white-space: nowrap;
+    animation: tickerScroll 18s linear infinite;
+  }
+  .ticker-track span {
+    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.18em;
+    text-transform: uppercase; padding: 0 3rem;
+  }
+  @keyframes tickerScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  /* push pages down when banner is visible */
+  body.banner-active .page { padding-top: calc(70px + 36px); }
+  body.banner-active nav { top: 0; }
+  body.banner-active .mobile-menu { top: calc(70px + 36px); }
+
+  /* ── GALLERY UPLOAD FEEDBACK ── */
+  .gallery-upload-toast {
+    position: fixed; bottom: 2rem; right: 2rem;
+    background: #0A1628; border: 1px solid var(--gold);
+    color: var(--gold); font-size: 0.75rem; letter-spacing: 0.1em;
+    padding: 0.9rem 1.5rem; z-index: 9999;
+    animation: toastIn 0.3s ease;
+    pointer-events: none;
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 </style>
 </head>
 <body>
+
+<!-- TICKER BANNER -->
+<div id="tickerBanner">
+  <div class="ticker-track" id="tickerTrack">
+    <!-- populated by JS -->
+  </div>
+</div>
 
 <!-- NAV -->
 <nav>
@@ -954,7 +1057,24 @@
     <li><a href="#" class="nav-cta" onclick="showPage('pricing')">Commander</a></li>
     <li><a href="#" onclick="showPage('admin')" style="opacity:0.3; font-size:0.6rem;">⚙</a></li>
   </ul>
+  <!-- Hamburger (mobile only) -->
+  <button class="hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+
+<!-- MOBILE MENU -->
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#" onclick="mobileNav('home')">Accueil</a>
+  <a href="#" onclick="mobileNav('about')">À Propos</a>
+  <a href="#" onclick="mobileNav('gallery')">Galerie</a>
+  <a href="#" onclick="mobileNav('pricing')">Tarifs</a>
+  <a href="#" onclick="mobileNav('testimonials')">Témoignages</a>
+  <a href="#" onclick="mobileNav('blog')">Blog</a>
+  <a href="#" onclick="mobileNav('contact')">Contact</a>
+  <a href="#" class="cta-mobile" onclick="mobileNav('pricing')">🎨 Commander</a>
+  <a href="#" class="admin-mobile" onclick="mobileNav('admin')">⚙ Administration</a>
+</div>
 
 <!-- ════════════════ PAGE: HOME ════════════════ -->
 <div id="page-home" class="page active">
@@ -1498,9 +1618,39 @@
             </div>
           </div>
 
-        </div><!-- /adminBlogList -->
-      </div><!-- /blog manager -->
-    </div><!-- /container -->
+          <!-- BLOG LIST -->
+          <div id="adminBlogList" style="display:flex; flex-direction:column; gap:0.6rem;">
+            <!-- populated by JS -->
+          </div>
+
+        </div><!-- /blog manager -->
+
+        <!-- ═══════════════ BANNER MANAGER ═══════════════ -->
+        <div style="margin-top:3rem;">
+          <div style="margin-bottom:1.5rem;">
+            <div class="section-label">Message Bande Passante</div>
+            <h3 style="font-family:'Cormorant Garamond',serif; font-size:1.8rem; color:var(--white); font-weight:300;">Bannière Animée</h3>
+          </div>
+          <div style="background:#0A1628; border:1px solid rgba(201,168,76,0.2); padding:2rem; display:flex; flex-direction:column; gap:1.2rem;">
+            <div>
+              <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Message à afficher</label>
+              <input type="text" id="bannerText" class="form-input-dark" placeholder="Ex: 🎨 Commandez votre portrait — Livraison dans toute la RDC ✦ Cadre offert ✦" style="margin-bottom:0;">
+            </div>
+            <div style="display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap;">
+              <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; color:rgba(255,255,255,0.7); font-size:0.78rem;">
+                <input type="checkbox" id="bannerActive" onchange="toggleBanner()" style="width:16px; height:16px; cursor:pointer; accent-color:var(--gold);">
+                Activer la bannière
+              </label>
+              <button onclick="saveBanner()" style="background:var(--gold); border:none; color:var(--blue-deep); font-family:'Josefin Sans',sans-serif; font-size:0.7rem; font-weight:600; padding:0.6rem 1.5rem; cursor:pointer; letter-spacing:0.15em; text-transform:uppercase;">💾 Sauvegarder</button>
+              <button onclick="clearBanner()" style="background:none; border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.4); font-family:'Josefin Sans',sans-serif; font-size:0.7rem; padding:0.6rem 1rem; cursor:pointer; letter-spacing:0.1em; text-transform:uppercase;">Effacer</button>
+            </div>
+            <div id="bannerPreviewBox" style="display:none; background:var(--gold); color:var(--blue-deep); padding:0.5rem 1rem; font-size:0.7rem; font-weight:600; letter-spacing:0.15em; text-transform:uppercase; overflow:hidden; white-space:nowrap;">
+              <span id="bannerPreviewText"></span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /container -->
     </section>
   </div><!-- /adminDashboard -->
 </div><!-- /page-admin -->
@@ -1684,8 +1834,31 @@
 function showPage(pageId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const target = document.getElementById('page-' + pageId);
-  if (target) { target.classList.add('active'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  if (target) {
+    target.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
   if (pageId === 'admin') initAdminPage();
+  // Re-render blog each time blog page is shown (fixes mobile empty blog bug)
+  if (pageId === 'blog') renderBlogPage();
+  // Re-render gallery each time gallery page is shown
+  if (pageId === 'gallery') { renderGalleryPage(); renderHomeGallery(); }
+}
+
+// ══════════════════════════════════════
+// MOBILE MENU
+// ══════════════════════════════════════
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const btn  = document.getElementById('hamburgerBtn');
+  menu.classList.toggle('open');
+  btn.classList.toggle('open');
+}
+
+function mobileNav(pageId) {
+  document.getElementById('mobileMenu').classList.remove('open');
+  document.getElementById('hamburgerBtn').classList.remove('open');
+  showPage(pageId);
 }
 
 // ══════════════════════════════════════
@@ -1702,6 +1875,7 @@ function checkAdmin() {
     renderAdminStats();
     renderAdminGallery();
     renderAdminBlogList();
+    loadBannerAdmin();
   } else {
     document.getElementById('adminError').style.display = 'block';
     document.getElementById('adminPwd').value = '';
@@ -1773,7 +1947,6 @@ function submitOrder() {
   saveLog(orderData);
   closeOrderModal();
 
-  // Open WhatsApp
   const msg = encodeURIComponent(
     `🎨 *Nouvelle Commande — Élirïs'Art*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
@@ -1828,7 +2001,6 @@ function renderLogs() {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:rgba(255,255,255,0.2); padding:2.5rem; font-style:italic;">Aucune commande enregistrée</td></tr>';
     return;
   }
-  const statusLabels = { new: 'Nouvelle', pending: 'En cours', completed: 'Terminée' };
   tbody.innerHTML = logs.map(l => `
     <tr>
       <td style="color:var(--gold); font-size:0.75rem;">${l.orderNum || '—'}</td>
@@ -1913,6 +2085,8 @@ const staticGalleryImages = [
 
 // ══════════════════════════════════════
 // DYNAMIC GALLERY (localStorage)
+// Images are stored as { id, src (base64), caption }
+// We compress to JPEG quality 0.7 to reduce storage usage
 // ══════════════════════════════════════
 function getGalleryItems() {
   try {
@@ -1928,20 +2102,54 @@ function getExtraGalleryItems() {
 function saveGalleryItem(item) {
   const items = getExtraGalleryItems();
   items.unshift(item);
-  localStorage.setItem('elirisart_gallery', JSON.stringify(items));
+  try {
+    localStorage.setItem('elirisart_gallery', JSON.stringify(items));
+  } catch(e) {
+    // localStorage quota exceeded — warn user
+    showToast('⚠ Stockage plein. Supprimez des images pour en ajouter.');
+    return false;
+  }
+  return true;
 }
 
 function deleteGalleryItem(id) {
+  if (!confirm('Supprimer cette image de la galerie ?')) return;
   const items = getExtraGalleryItems().filter(i => i.id !== id);
   localStorage.setItem('elirisart_gallery', JSON.stringify(items));
   renderGalleryPage();
   renderHomeGallery();
   renderAdminGallery();
+  showToast('🗑 Image supprimée');
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'gallery-upload-toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function compressImage(file, quality, maxW) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const ratio = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = url;
+  });
 }
 
 function renderGalleryPage() {
   const all = getGalleryItems();
-  // Update lightbox data
   galleryImages.length = 0;
   all.forEach(i => galleryImages.push({ src: i.src, caption: i.caption }));
 
@@ -1968,7 +2176,7 @@ function renderGalleryPage() {
     const short = item.caption.split(' — ')[0].split(' • ')[0];
     return `
       <div class="gallery-item" style="${style};" onclick="openLightbox(${idx})">
-        <img src="${item.src}" alt="${item.caption}" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
+        <img src="${item.src}" alt="${item.caption}" loading="lazy" style="width:100%;height:100%;object-fit:cover;transition:transform 0.6s ease;">
         <div class="gallery-overlay"><div class="gallery-overlay-text">${short}</div></div>
       </div>`;
   }).join('');
@@ -1981,7 +2189,7 @@ function renderHomeGallery() {
   if (!grid) return;
   grid.innerHTML = preview.map((item, idx) => `
     <div class="gallery-item" onclick="openLightbox(${idx})">
-      <img src="${item.src}" alt="${item.caption}" style="width:100%;height:100%;object-fit:cover;">
+      <img src="${item.src}" alt="${item.caption}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
       <div class="gallery-overlay"><div class="gallery-overlay-text">${item.caption.split(' — ')[0]}</div></div>
     </div>`).join('');
 }
@@ -1991,12 +2199,12 @@ function renderAdminGallery() {
   const grid = document.getElementById('adminGalleryGrid');
   if (!grid) return;
   if (extra.length === 0) {
-    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:2rem; color:rgba(255,255,255,0.25); font-size:0.8rem; font-style:italic; border:1px dashed rgba(255,255,255,0.08);">Aucune image ajoutée via l\'admin. Les images ci-dessus sont les photos d\'origine.</div>';
+    grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:2rem; color:rgba(255,255,255,0.25); font-size:0.8rem; font-style:italic; border:1px dashed rgba(255,255,255,0.08);">Aucune image ajoutée via l\'admin. Les photos d\'origine sont affichées par défaut.</div>';
     return;
   }
   grid.innerHTML = extra.map(item => `
     <div class="admin-gallery-card">
-      <img src="${item.src}" alt="${item.caption}">
+      <img src="${item.src}" alt="${item.caption}" loading="lazy">
       <div class="admin-gallery-actions">
         <div style="font-size:0.72rem; color:rgba(255,255,255,0.7); text-align:center; padding:0 0.5rem; margin-bottom:0.5rem; line-height:1.4;">${item.caption}</div>
         <button onclick="deleteGalleryItem('${item.id}')" style="background:#c0392b; border:none; color:white; font-family:'Josefin Sans',sans-serif; font-size:0.62rem; padding:0.4rem 0.9rem; cursor:pointer; letter-spacing:0.1em; text-transform:uppercase;">🗑 Supprimer</button>
@@ -2012,21 +2220,23 @@ function handleGalleryDrop(event) {
   handleGalleryFiles(event.dataTransfer.files);
 }
 
-function handleGalleryFiles(files) {
-  Array.from(files).forEach(file => {
-    if (!file.type.startsWith('image/')) return;
-    if (file.size > 5 * 1024 * 1024) { alert(`${file.name} dépasse 5 MB, ignoré.`); return; }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const caption = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
-      const item = { id: Date.now() + Math.random(), src: e.target.result, caption };
-      saveGalleryItem(item);
+async function handleGalleryFiles(files) {
+  const arr = Array.from(files);
+  for (const file of arr) {
+    if (!file.type.startsWith('image/')) continue;
+    if (file.size > 5 * 1024 * 1024) { alert(`${file.name} dépasse 5 MB, ignoré.`); continue; }
+    // Compress to max 1200px wide, quality 0.75 to save localStorage space
+    const compressed = await compressImage(file, 0.75, 1200);
+    const caption = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+    const item = { id: String(Date.now() + Math.random()), src: compressed, caption };
+    const saved = saveGalleryItem(item);
+    if (saved) {
       renderGalleryPage();
       renderHomeGallery();
       renderAdminGallery();
-    };
-    reader.readAsDataURL(file);
-  });
+      showToast('✅ Image ajoutée à la galerie');
+    }
+  }
 }
 
 // ══════════════════════════════════════
@@ -2055,7 +2265,7 @@ function renderBlogPage() {
   grid.innerHTML = posts.map(post => `
     <div class="blog-card" onclick="openBlogPost('${post.id}')">
       <div class="blog-card-img">
-        ${post.cover ? `<img src="${post.cover}" alt="${post.title}">` : `<div style="font-size:3rem; color:rgba(201,168,76,0.2);">✦</div>`}
+        ${post.cover ? `<img src="${post.cover}" alt="${post.title}" loading="lazy">` : `<div style="font-size:3rem; color:rgba(201,168,76,0.2);">✦</div>`}
       </div>
       <div class="blog-card-body">
         <div class="blog-card-cat">${post.category || 'Article'}</div>
@@ -2226,7 +2436,77 @@ function blogInsertHeading() {
   document.execCommand('formatBlock', false, 'h2');
 }
 
+// ══════════════════════════════════════
+// TICKER BANNER SYSTEM
+// ══════════════════════════════════════
+function getBannerData() {
+  try { return JSON.parse(localStorage.getItem('elirisart_banner') || 'null'); } catch { return null; }
+}
 
+function applyBanner() {
+  const data = getBannerData();
+  const banner = document.getElementById('tickerBanner');
+  const track  = document.getElementById('tickerTrack');
+  if (data && data.active && data.text) {
+    // Duplicate text for seamless loop
+    const repeated = Array(6).fill(`<span>${data.text} &nbsp;✦&nbsp; </span>`).join('');
+    track.innerHTML = repeated;
+    banner.classList.add('active');
+    document.body.classList.add('banner-active');
+  } else {
+    banner.classList.remove('active');
+    document.body.classList.remove('banner-active');
+  }
+}
+
+function loadBannerAdmin() {
+  const data = getBannerData();
+  if (data) {
+    document.getElementById('bannerText').value = data.text || '';
+    document.getElementById('bannerActive').checked = !!data.active;
+    updateBannerPreview();
+  }
+}
+
+function saveBanner() {
+  const text   = document.getElementById('bannerText').value.trim();
+  const active = document.getElementById('bannerActive').checked;
+  if (!text && active) { alert('Entrez un texte pour la bannière.'); return; }
+  localStorage.setItem('elirisart_banner', JSON.stringify({ text, active }));
+  applyBanner();
+  updateBannerPreview();
+  showToast('✅ Bannière sauvegardée');
+}
+
+function clearBanner() {
+  document.getElementById('bannerText').value = '';
+  document.getElementById('bannerActive').checked = false;
+  localStorage.removeItem('elirisart_banner');
+  applyBanner();
+  document.getElementById('bannerPreviewBox').style.display = 'none';
+  showToast('Bannière désactivée');
+}
+
+function toggleBanner() {
+  // Live-update when checkbox changes without saving
+  updateBannerPreview();
+}
+
+function updateBannerPreview() {
+  const text   = document.getElementById('bannerText').value.trim();
+  const active = document.getElementById('bannerActive').checked;
+  const box    = document.getElementById('bannerPreviewBox');
+  if (text && active) {
+    document.getElementById('bannerPreviewText').textContent = text + ' ✦ ' + text;
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════
+// RECEIPT
+// ══════════════════════════════════════
 function openReceipt(log) {
   document.getElementById('rcptNumber').textContent = log.orderNum || ('EA-' + log.id);
   document.getElementById('rcptDate').textContent = log.date;
@@ -2326,9 +2606,7 @@ function submitTestimonial() {
 // ══════════════════════════════════════
 // LIGHTBOX
 // ══════════════════════════════════════
-// galleryImages is populated dynamically by renderGalleryPage()
 const galleryImages = [];
-
 let lbIndex = 0;
 
 function openLightbox(idx) {
@@ -2347,7 +2625,7 @@ function renderLightbox() {
   const item = galleryImages[lbIndex];
   const img = document.getElementById('lightboxImg');
   img.style.animation = 'none';
-  img.offsetHeight; // reflow
+  img.offsetHeight;
   img.style.animation = '';
   img.src = item.src;
   img.alt = item.caption;
@@ -2368,6 +2646,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderGalleryPage();
   renderHomeGallery();
   renderBlogPage();
+  applyBanner();
+
   document.getElementById('orderModal').addEventListener('click', function(e) { if(e.target===this) closeOrderModal(); });
   document.getElementById('receiptModal').addEventListener('click', function(e) { if(e.target===this) closeReceipt(); });
   document.getElementById('lightbox').addEventListener('click', function(e) { if(e.target===this) closeLightbox(); });
@@ -2387,6 +2667,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const dx = e.changedTouches[0].clientX - lbTouchX;
     if (Math.abs(dx) > 50) lbNav(dx < 0 ? 1 : -1);
   }, { passive: true });
+
+  // Live preview as banner text is typed
+  const bannerTextEl = document.getElementById('bannerText');
+  if (bannerTextEl) bannerTextEl.addEventListener('input', updateBannerPreview);
 });
 </script>
 </body>
