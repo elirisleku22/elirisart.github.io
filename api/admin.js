@@ -11,7 +11,11 @@ module.exports = async function handler(req, res) {
 
   const { action, password, ...data } = body;
 
-  if (!password || password !== process.env.ADMIN_PASSWORD) {
+  // Les photos clients utilisent un token spécial basé sur le N° commande
+  const isPhotoUpload = action === 'save_order_photo' && password && password.startsWith('CLIENT_PHOTO_');
+  const isAdmin = password === process.env.ADMIN_PASSWORD;
+
+  if (!isAdmin && !isPhotoUpload) {
     return res.status(401).json({ error: 'Non autorisé' });
   }
 
@@ -43,7 +47,11 @@ module.exports = async function handler(req, res) {
       return res.json({ orders: data || [] });
     }
     if (action === 'upsert_banner') {
-      await sb('POST', 'banner?on_conflict=id', { id: 'main', ...data });
+      // Essaie d'abord un UPDATE, sinon INSERT
+      const upd = await sb('PATCH', 'banner?id=eq.main', { text: data.text, active: data.active });
+      if (upd.status === 404 || (Array.isArray(upd.data) && upd.data.length === 0)) {
+        await sb('POST', 'banner', { id: 'main', text: data.text, active: data.active });
+      }
       return res.json({ error: null });
     }
     if (action === 'insert_gallery') {
@@ -78,6 +86,26 @@ module.exports = async function handler(req, res) {
     if (action === 'clear_orders') {
       await sb('DELETE', 'orders?id=neq.00000000-0000-0000-0000-000000000000');
       return res.json({ error: null });
+    }
+    if (action === 'save_order_photo') {
+      // Sauvegarde une photo liée à une commande (base64 + order_num)
+      const { error } = await sb('POST', 'order_photos', {
+        order_num: data.order_num,
+        client_name: data.client_name,
+        photo: data.photo, // base64
+        created_at: Date.now()
+      });
+      return res.json({ error });
+    }
+    if (action === 'get_order_photos') {
+      // Récupère les photos d'une commande spécifique (admin uniquement)
+      const { data: photos } = await sb('GET', `order_photos?order_num=eq.${data.order_num}&order=created_at.desc`);
+      return res.json({ photos: photos || [] });
+    }
+    if (action === 'get_all_photos') {
+      // Récupère toutes les photos (admin uniquement)
+      const { data: photos } = await sb('GET', 'order_photos?order=created_at.desc');
+      return res.json({ photos: photos || [] });
     }
 
     return res.status(400).json({ error: 'Action inconnue : ' + action });
