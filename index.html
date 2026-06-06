@@ -167,6 +167,110 @@
 <link rel="sitemap" type="application/xml" href="/sitemap.xml">
 
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Josefin+Sans:wght@200;300;400;600&display=swap" rel="stylesheet">
+
+<!-- ══ SUPABASE ══ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ════════════════════════════════════════════════════
+// SUPABASE — client public (lecture + insert clients)
+// Toutes les actions admin passent par /api/admin
+// ════════════════════════════════════════════════════
+const SUPABASE_URL      = 'https://ufssyiivtcwpcdhxgqrp.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_wLOfKy-MX7dqaUT9HofIBw_qGm8boeu';
+
+const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+window._isAdmin      = false;
+window._adminPwd     = '';
+window._galleryItems = [];
+window._blogPosts    = [];
+window._extraTestis  = [];
+window._orders       = [];
+window._bannerData   = null;
+
+// ─── Appel API admin sécurisé ────────────────────────
+async function _adminCall(action, data = {}) {
+  const res = await fetch('/api/admin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, password: window._adminPwd, ...data })
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Erreur serveur');
+  return json;
+}
+
+// ─── Temps réel : bannière ───────────────────────────
+_supa.channel('banner-rt').on('postgres_changes',
+  { event: '*', schema: 'public', table: 'banner' },
+  () => _loadBanner()
+).subscribe();
+
+async function _loadBanner() {
+  const { data } = await _supa.from('banner').select('*').eq('id','main').single();
+  window._bannerData = data;
+  if (typeof applyBanner === 'function') applyBanner();
+}
+
+// ─── Temps réel : galerie ────────────────────────────
+_supa.channel('gallery-rt').on('postgres_changes',
+  { event: '*', schema: 'public', table: 'gallery' },
+  () => _loadGallery()
+).subscribe();
+
+async function _loadGallery() {
+  const { data } = await _supa.from('gallery').select('*').order('created_at', { ascending: false });
+  window._galleryItems = data || [];
+  if (typeof renderGalleryPage === 'function') { renderGalleryPage(); renderHomeGallery(); }
+  if (typeof renderAdminGallery === 'function') renderAdminGallery();
+}
+
+// ─── Temps réel : blog ───────────────────────────────
+_supa.channel('blog-rt').on('postgres_changes',
+  { event: '*', schema: 'public', table: 'blog' },
+  () => _loadBlog()
+).subscribe();
+
+async function _loadBlog() {
+  const { data } = await _supa.from('blog').select('*').order('created_at', { ascending: false });
+  window._blogPosts = data || [];
+  if (typeof renderBlogPage === 'function') renderBlogPage();
+  if (typeof renderAdminBlogList === 'function') renderAdminBlogList();
+}
+
+// ─── Temps réel : témoignages ────────────────────────
+_supa.channel('testis-rt').on('postgres_changes',
+  { event: '*', schema: 'public', table: 'testimonials' },
+  () => _loadTestis()
+).subscribe();
+
+async function _loadTestis() {
+  const { data } = await _supa.from('testimonials').select('*').order('created_at', { ascending: false });
+  window._extraTestis = data || [];
+  if (typeof renderTestis === 'function') renderTestis();
+}
+
+// ─── Commandes : chargées UNIQUEMENT pour l'admin via API ─
+async function _loadOrders() {
+  if (!window._isAdmin) return;
+  try {
+    const { orders } = await _adminCall('get_orders');
+    window._orders = orders || [];
+    if (typeof renderLogs === 'function') renderLogs();
+    if (typeof renderAdminStats === 'function') renderAdminStats();
+  } catch(e) { console.error('Erreur chargement commandes:', e); }
+}
+
+// ─── Écoute temps réel commandes via anon (admin connecté) ─
+// ─── Chargement initial (données publiques seulement) ─
+async function _initSupabase() {
+  await Promise.all([_loadBanner(), _loadGallery(), _loadBlog(), _loadTestis()]);
+  console.log('✅ Supabase connecté — Élirïs\'Art');
+}
+
+document.addEventListener('DOMContentLoaded', _initSupabase);
+</script>
+
 <style>
   :root {
     --blue-deep: #042C53;
@@ -1862,13 +1966,15 @@ function mobileNav(pageId) {
 }
 
 // ══════════════════════════════════════
-// ADMIN AUTH
+// ADMIN AUTH — mot de passe vérifié côté serveur (/api/admin)
 // ══════════════════════════════════════
-const ADMIN_PWD = 'eliris2025';
 
 function checkAdmin() {
   const pwd = document.getElementById('adminPwd').value;
-  if (pwd === ADMIN_PWD) {
+  window._adminPwd = pwd;
+  _adminCall('get_orders').then(({ orders }) => {
+    window._isAdmin = true;
+    window._orders  = orders || [];
     document.getElementById('adminLogin').style.display = 'none';
     document.getElementById('adminDashboard').style.display = 'block';
     renderLogs();
@@ -1876,13 +1982,17 @@ function checkAdmin() {
     renderAdminGallery();
     renderAdminBlogList();
     loadBannerAdmin();
-  } else {
+  }).catch(() => {
+    window._adminPwd = '';
     document.getElementById('adminError').style.display = 'block';
     document.getElementById('adminPwd').value = '';
-  }
+  });
 }
 
 function adminLogout() {
+  window._isAdmin  = false;
+  window._adminPwd = '';
+  window._orders   = [];
   document.getElementById('adminDashboard').style.display = 'none';
   document.getElementById('adminLogin').style.display = 'flex';
   document.getElementById('adminPwd').value = '';
@@ -1963,32 +2073,29 @@ function submitOrder() {
 }
 
 // ══════════════════════════════════════
-// LOGS (admin only)
+// LOGS (admin only) — Supabase
 // ══════════════════════════════════════
-function saveLog(data) {
-  const logs = getLogs();
-  logs.unshift({
-    id: Date.now(),
-    orderNum: data.orderNum,
+async function saveLog(data) {
+  // Les clients peuvent insérer des commandes (RLS le permet)
+  await _supa.from('orders').insert({
+    order_num: data.orderNum,
     date: new Date().toLocaleString('fr-FR'),
     name: data.name,
     phone: data.phone,
     format: data.format,
     amount: data.amount,
-    desc: data.desc || '',
-    status: 'new'
+    description: data.desc || '',
+    status: 'new',
+    created_at: Date.now()
   });
-  localStorage.setItem('elirisart_logs', JSON.stringify(logs));
 }
 
 function getLogs() {
-  try { return JSON.parse(localStorage.getItem('elirisart_logs') || '[]'); } catch { return []; }
+  return window._orders || [];
 }
 
-function updateLogStatus(id, status) {
-  const logs = getLogs();
-  const idx = logs.findIndex(l => l.id === id);
-  if (idx >= 0) { logs[idx].status = status; localStorage.setItem('elirisart_logs', JSON.stringify(logs)); renderLogs(); renderAdminStats(); }
+async function updateLogStatus(firestoreId, status) {
+  await _adminCall('update_order_status', { id: firestoreId, status });
 }
 
 function renderLogs() {
@@ -2003,15 +2110,15 @@ function renderLogs() {
   }
   tbody.innerHTML = logs.map(l => `
     <tr>
-      <td style="color:var(--gold); font-size:0.75rem;">${l.orderNum || '—'}</td>
+      <td style="color:var(--gold); font-size:0.75rem;">${l.order_num || '—'}</td>
       <td style="font-size:0.75rem;">${l.date}</td>
       <td style="font-weight:500;">${l.name}</td>
       <td style="color:var(--gold); font-weight:600;">${l.format}</td>
       <td style="color:#4ade80; font-weight:600;">${l.amount} $</td>
       <td style="font-size:0.78rem;">${l.phone}</td>
-      <td style="font-size:0.72rem; color:rgba(255,255,255,0.5); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${l.desc || '—'}</td>
+      <td style="font-size:0.72rem; color:rgba(255,255,255,0.5); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${l.description || '—'}</td>
       <td>
-        <select onchange="updateLogStatus(${l.id}, this.value)" style="background:#0A1628; border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.7); font-size:0.65rem; padding:0.2rem 0.5rem; font-family:'Josefin Sans',sans-serif; cursor:pointer;">
+        <select onchange="updateLogStatus('${l.id}', this.value)" style="background:#0A1628; border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.7); font-size:0.65rem; padding:0.2rem 0.5rem; font-family:'Josefin Sans',sans-serif; cursor:pointer;">
           <option value="new" ${l.status==='new'?'selected':''}>Nouvelle</option>
           <option value="pending" ${l.status==='pending'?'selected':''}>En cours</option>
           <option value="completed" ${l.status==='completed'?'selected':''}>Terminée</option>
@@ -2044,11 +2151,10 @@ function renderAdminStats() {
   `).join('');
 }
 
-function clearLogs() {
-  if (confirm('Vider tout le journal des commandes ? Cette action est irréversible.')) {
-    localStorage.removeItem('elirisart_logs');
-    renderLogs(); renderAdminStats();
-  }
+async function clearLogs() {
+  if (!confirm('Vider tout le journal des commandes ? Cette action est irréversible.')) return;
+  await _adminCall('clear_orders');
+  showToast('🗑 Journal vidé');
 }
 
 function exportLogs() {
@@ -2084,42 +2190,41 @@ const staticGalleryImages = [
 ];
 
 // ══════════════════════════════════════
-// DYNAMIC GALLERY (localStorage)
-// Images are stored as { id, src (base64), caption }
-// We compress to JPEG quality 0.7 to reduce storage usage
+// DYNAMIC GALLERY — Supabase Storage
 // ══════════════════════════════════════
 function getGalleryItems() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('elirisart_gallery') || '[]');
-    return [...staticGalleryImages, ...stored];
-  } catch { return staticGalleryImages; }
+  return [...staticGalleryImages, ...(window._galleryItems || [])];
 }
 
 function getExtraGalleryItems() {
-  try { return JSON.parse(localStorage.getItem('elirisart_gallery') || '[]'); } catch { return []; }
+  return window._galleryItems || [];
 }
 
-function saveGalleryItem(item) {
-  const items = getExtraGalleryItems();
-  items.unshift(item);
+async function saveGalleryItem(item) {
+  showToast('⏳ Envoi en cours…');
   try {
-    localStorage.setItem('elirisart_gallery', JSON.stringify(items));
+    const { error } = await _adminCall('insert_gallery', {
+      src: item.src,
+      caption: item.caption,
+      created_at: Date.now()
+    });
+    if (error) throw new Error(error.message || JSON.stringify(error));
+    return true;
   } catch(e) {
-    // localStorage quota exceeded — warn user
-    showToast('⚠ Stockage plein. Supprimez des images pour en ajouter.');
+    console.error(e);
+    showToast('❌ Erreur : ' + e.message);
     return false;
   }
-  return true;
 }
 
-function deleteGalleryItem(id) {
+async function deleteGalleryItem(id) {
   if (!confirm('Supprimer cette image de la galerie ?')) return;
-  const items = getExtraGalleryItems().filter(i => i.id !== id);
-  localStorage.setItem('elirisart_gallery', JSON.stringify(items));
-  renderGalleryPage();
-  renderHomeGallery();
-  renderAdminGallery();
-  showToast('🗑 Image supprimée');
+  try {
+    await _adminCall('delete_gallery', { id });
+    showToast('🗑 Image supprimée');
+  } catch(e) {
+    showToast('❌ Erreur suppression');
+  }
 }
 
 function showToast(msg) {
@@ -2224,30 +2329,22 @@ async function handleGalleryFiles(files) {
   const arr = Array.from(files);
   for (const file of arr) {
     if (!file.type.startsWith('image/')) continue;
-    if (file.size > 5 * 1024 * 1024) { alert(`${file.name} dépasse 5 MB, ignoré.`); continue; }
-    // Compress to max 1200px wide, quality 0.75 to save localStorage space
-    const compressed = await compressImage(file, 0.75, 1200);
+    if (file.size > 10 * 1024 * 1024) { alert(`${file.name} dépasse 10 MB, ignoré.`); continue; }
+    // Compress to max 1400px wide, quality 0.80
+    const compressed = await compressImage(file, 0.80, 1400);
     const caption = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
-    const item = { id: String(Date.now() + Math.random()), src: compressed, caption };
-    const saved = saveGalleryItem(item);
-    if (saved) {
-      renderGalleryPage();
-      renderHomeGallery();
-      renderAdminGallery();
-      showToast('✅ Image ajoutée à la galerie');
-    }
+    const item = { id: String(Date.now() + Math.random()).replace('.',''), src: compressed, caption };
+    await saveGalleryItem(item);
+    // renderGallery called automatically by onSnapshot listener
   }
+  showToast('✅ Images envoyées !');
 }
 
 // ══════════════════════════════════════
-// BLOG SYSTEM
+// BLOG SYSTEM — Supabase
 // ══════════════════════════════════════
 function getBlogPosts() {
-  try { return JSON.parse(localStorage.getItem('elirisart_blog') || '[]'); } catch { return []; }
-}
-
-function saveBlogPosts(posts) {
-  localStorage.setItem('elirisart_blog', JSON.stringify(posts));
+  return window._blogPosts || [];
 }
 
 function renderBlogPage() {
@@ -2355,50 +2452,37 @@ function editBlogPost(id) {
   document.getElementById('blogEditor').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function deleteBlogPost(id) {
+async function deleteBlogPost(id) {
   if (!confirm('Supprimer cet article ? Action irréversible.')) return;
-  const posts = getBlogPosts().filter(p => p.id !== id);
-  saveBlogPosts(posts);
-  renderBlogPage();
-  renderAdminBlogList();
+  await _adminCall('delete_blog', { id });
+  showToast('🗑 Article supprimé');
 }
 
-function saveBlogPost() {
+async function saveBlogPost() {
   const title = document.getElementById('blogTitle').value.trim();
   const content = document.getElementById('blogContent').innerHTML.trim();
   if (!title || !content || content === '') { alert('Le titre et le contenu sont obligatoires.'); return; }
 
-  const posts = getBlogPosts();
   const editId = document.getElementById('blogEditId').value;
   const now = new Date().toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
+  const postData = {
+    title,
+    excerpt: document.getElementById('blogExcerpt').value.trim(),
+    category: document.getElementById('blogCategory').value,
+    cover: document.getElementById('blogCoverData').value || null,
+    content,
+    date: now,
+    created_at: editId ? (getBlogPosts().find(p=>p.id===editId)?.created_at || Date.now()) : Date.now()
+  };
 
   if (editId) {
-    const idx = posts.findIndex(p => p.id === editId);
-    if (idx >= 0) {
-      posts[idx].title = title;
-      posts[idx].excerpt = document.getElementById('blogExcerpt').value.trim();
-      posts[idx].category = document.getElementById('blogCategory').value;
-      posts[idx].content = content;
-      const coverVal = document.getElementById('blogCoverData').value;
-      if (coverVal) posts[idx].cover = coverVal;
-    }
+    await _adminCall('update_blog', { id: editId, ...postData });
   } else {
-    posts.unshift({
-      id: 'bp' + Date.now(),
-      title,
-      excerpt: document.getElementById('blogExcerpt').value.trim(),
-      category: document.getElementById('blogCategory').value,
-      cover: document.getElementById('blogCoverData').value || null,
-      content,
-      date: now,
-    });
+    await _adminCall('insert_blog', postData);
   }
 
-  saveBlogPosts(posts);
   cancelBlogEditor();
-  renderBlogPage();
-  renderAdminBlogList();
-  alert('✅ Article publié avec succès !');
+  showToast('✅ Article publié !');
 }
 
 function handleBlogCover(input) {
@@ -2437,10 +2521,10 @@ function blogInsertHeading() {
 }
 
 // ══════════════════════════════════════
-// TICKER BANNER SYSTEM
+// TICKER BANNER SYSTEM — Supabase
 // ══════════════════════════════════════
 function getBannerData() {
-  try { return JSON.parse(localStorage.getItem('elirisart_banner') || 'null'); } catch { return null; }
+  return window._bannerData || null;
 }
 
 function applyBanner() {
@@ -2448,7 +2532,6 @@ function applyBanner() {
   const banner = document.getElementById('tickerBanner');
   const track  = document.getElementById('tickerTrack');
   if (data && data.active && data.text) {
-    // Duplicate text for seamless loop
     const repeated = Array(6).fill(`<span>${data.text} &nbsp;✦&nbsp; </span>`).join('');
     track.innerHTML = repeated;
     banner.classList.add('active');
@@ -2468,21 +2551,18 @@ function loadBannerAdmin() {
   }
 }
 
-function saveBanner() {
+async function saveBanner() {
   const text   = document.getElementById('bannerText').value.trim();
   const active = document.getElementById('bannerActive').checked;
   if (!text && active) { alert('Entrez un texte pour la bannière.'); return; }
-  localStorage.setItem('elirisart_banner', JSON.stringify({ text, active }));
-  applyBanner();
-  updateBannerPreview();
+  await _adminCall('upsert_banner', { text, active });
   showToast('✅ Bannière sauvegardée');
 }
 
-function clearBanner() {
+async function clearBanner() {
   document.getElementById('bannerText').value = '';
   document.getElementById('bannerActive').checked = false;
-  localStorage.removeItem('elirisart_banner');
-  applyBanner();
+  await _adminCall('upsert_banner', { text: '', active: false });
   document.getElementById('bannerPreviewBox').style.display = 'none';
   showToast('Bannière désactivée');
 }
@@ -2508,21 +2588,21 @@ function updateBannerPreview() {
 // RECEIPT
 // ══════════════════════════════════════
 function openReceipt(log) {
-  document.getElementById('rcptNumber').textContent = log.orderNum || ('EA-' + log.id);
+  document.getElementById('rcptNumber').textContent = log.order_num || ('EA-' + log.id);
   document.getElementById('rcptDate').textContent = log.date;
   document.getElementById('rcptName').textContent = log.name;
   document.getElementById('rcptPhone').textContent = log.phone;
   document.getElementById('rcptFormat').textContent = 'Portrait ' + log.format;
   document.getElementById('rcptDims').textContent = getDimensions(log.format);
   document.getElementById('rcptFormatCell').textContent = log.format + ' — ' + getDimensions(log.format);
-  document.getElementById('rcptDesc').textContent = log.desc || 'Portrait réaliste au stylo à bille.';
+  document.getElementById('rcptDesc').textContent = log.description || 'Portrait réaliste au stylo à bille.';
   document.getElementById('rcptAmountCell').textContent = log.amount + ' $';
   document.getElementById('rcptTotal').textContent = log.amount + ' $';
 
   const waMsg = encodeURIComponent(
     `🧾 *Reçu de Commande — Élirïs'Art*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
-    `📋 *N° :* ${log.orderNum || log.id}\n` +
+    `📋 *N° :* ${log.order_num || log.id}\n` +
     `📅 *Date :* ${log.date}\n` +
     `👤 *Client :* ${log.name}\n` +
     `📱 *Contact :* ${log.phone}\n` +
@@ -2559,7 +2639,7 @@ function printReceipt() {
 }
 
 // ══════════════════════════════════════
-// TESTIMONIALS
+// TESTIMONIALS — Supabase
 // ══════════════════════════════════════
 const defaultTestis = [
   { name:'Amani K.', loc:'Goma, RDC', text:'Élie a réalisé le portrait de ma mère pour son anniversaire. La ressemblance est saisissante — elle a pleuré de joie. Un talent rare, une œuvre précieuse.', stars:5, initials:'AK' },
@@ -2568,39 +2648,46 @@ const defaultTestis = [
 ];
 
 function getTestis() {
-  const stored = localStorage.getItem('elirisart_testis');
-  if (stored) { try { return [...defaultTestis, ...JSON.parse(stored)]; } catch {} }
-  return defaultTestis;
+  return [...defaultTestis, ...(window._extraTestis || [])];
 }
 
 function renderTestis() {
   const grid = document.getElementById('testiGrid');
   if (!grid) return;
-  grid.innerHTML = getTestis().map(t => `
-    <div class="testi-card">
+  grid.innerHTML = getTestis().map((t, i) => `
+    <div class="testi-card" style="position:relative;">
+      ${(window._isAdmin && t.id) ? `<button onclick="deleteTestimonial('${t.id}')" style="position:absolute;top:0.6rem;right:0.6rem;background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.3);color:#e74c3c;font-size:0.6rem;padding:0.2rem 0.5rem;cursor:pointer;font-family:'Josefin Sans',sans-serif;letter-spacing:0.08em;text-transform:uppercase;">🗑</button>` : ''}
       <div class="testi-stars">${'★'.repeat(t.stars)}${'☆'.repeat(5-t.stars)}</div>
       <p class="testi-text">"${t.text}"</p>
       <div class="testi-author">
-        <div class="testi-avatar">${t.initials}</div>
-        <div><div class="testi-name">${t.name}</div><div class="testi-loc">${t.loc}</div></div>
+        <div class="testi-avatar">${t.initials || t.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+        <div><div class="testi-name">${t.name}</div><div class="testi-loc">${t.loc || 'RDC'}</div></div>
       </div>
     </div>
   `).join('');
 }
 
-function submitTestimonial() {
+async function submitTestimonial() {
   const name = document.getElementById('testiName').value.trim();
   const loc  = document.getElementById('testiLoc').value.trim();
   const text = document.getElementById('testiText').value.trim();
   if (!name || !text) { alert('Veuillez entrer votre nom et votre témoignage.'); return; }
-  const existing = JSON.parse(localStorage.getItem('elirisart_testis') || '[]');
-  existing.unshift({ name, loc: loc || 'RDC', text, stars:5, initials:name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() });
-  localStorage.setItem('elirisart_testis', JSON.stringify(existing));
+  await _supa.from('testimonials').insert({
+    name, loc: loc || 'RDC', text, stars: 5,
+    initials: name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(),
+    created_at: Date.now()
+  });
   document.getElementById('testiName').value = '';
   document.getElementById('testiLoc').value  = '';
   document.getElementById('testiText').value = '';
-  renderTestis();
-  alert('Merci pour votre témoignage !');
+  showToast('Merci pour votre témoignage !');
+}
+
+async function deleteTestimonial(id) {
+  if (!window._isAdmin) return;
+  if (!confirm('Supprimer ce témoignage ?')) return;
+  await _adminCall('delete_testimonial', { id });
+  showToast('🗑 Témoignage supprimé');
 }
 
 // ══════════════════════════════════════
