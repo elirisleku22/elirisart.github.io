@@ -1197,6 +1197,14 @@ document.addEventListener('DOMContentLoaded', _initSupabase);
         <a href="#" class="btn-gold" onclick="showPage('gallery')">Voir la Galerie</a>
         <a href="#" class="btn-outline" onclick="showPage('pricing')">Commander un Portrait</a>
       </div>
+      <!-- Grand bouton messagerie -->
+      <div style="margin-top:1.5rem; animation:fadeDown 1s ease 0.9s both;">
+        <a href="#" onclick="goToMessages()" style="display:inline-flex; align-items:center; gap:0.7rem; background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.4); color:var(--gold); padding:0.9rem 2rem; font-family:'Josefin Sans',sans-serif; font-size:0.72rem; letter-spacing:0.15em; text-transform:uppercase; text-decoration:none; transition:all 0.3s;" onmouseover="this.style.background='rgba(201,168,76,0.2)'" onmouseout="this.style.background='rgba(201,168,76,0.1)'">
+          <span style="font-size:1.1rem;">💬</span>
+          <span>Espace Client — Mes Commandes & Messages</span>
+          <span style="font-size:0.9rem;">→</span>
+        </a>
+      </div>
     </div>
     <div class="hero-scroll"><div class="hero-scroll-inner"></div></div>
   </section>
@@ -2116,6 +2124,14 @@ function generateOrderNumber() {
 }
 
 async function submitOrder() {
+  // Oblige le client à être connecté
+  if (!window._currentUser) {
+    closeOrderModal();
+    showToast('👤 Créez un compte pour passer commande');
+    setTimeout(() => { showPage('auth'); switchAuthTab('signup'); }, 600);
+    return;
+  }
+
   const name   = document.getElementById('orderName').value.trim();
   const phone  = document.getElementById('orderPhone').value.trim();
   const amount = parseFloat(document.getElementById('orderAmount').value);
@@ -2131,50 +2147,26 @@ async function submitOrder() {
   }
   errEl.style.display = 'none';
 
-  const orderNum  = generateOrderNumber();
-  const orderData = { orderNum, name, phone, format: currentFormat, amount, desc };
+  const orderNum = generateOrderNumber();
+  await saveLog({ orderNum, name, phone, format: currentFormat, amount, desc });
 
-  // Sauvegarde la commande
-  await saveLog(orderData);
-
-  // Si photo fournie, l'envoyer séparément via /api/admin avec un mot de passe "client"
-  // La photo est stockée avec le numéro de commande — visible seulement par l'admin
   if (photo) {
     try {
       await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'save_order_photo',
-          password: 'CLIENT_PHOTO_' + orderNum, // token unique basé sur le N° commande
-          order_num: orderNum,
-          client_name: name,
-          photo
-        })
+        body: JSON.stringify({ action: 'save_order_photo', password: 'CLIENT_PHOTO_' + orderNum, order_num: orderNum, client_name: name, photo })
       });
     } catch(e) { console.error('Photo upload failed:', e); }
   }
 
   closeOrderModal();
-  // Reset photo
   document.getElementById('orderPhotoData').value = '';
   document.getElementById('photoPreview').style.display = 'none';
   document.getElementById('photoUploadLabel').textContent = 'Cliquez pour choisir une photo';
 
-  const msg = encodeURIComponent(
-    `🎨 *Nouvelle Commande — Élirïs'Art*\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `📋 *N° Commande :* ${orderNum}\n` +
-    `👤 *Client :* ${name}\n` +
-    `📱 *WhatsApp :* ${phone}\n` +
-    `🖼️ *Format :* Portrait ${currentFormat} (${getDimensions(currentFormat)})\n` +
-    `💵 *Montant :* ${amount} $\n` +
-    `📝 *Description :* ${desc || 'Non précisée'}\n` +
-    (photo ? `📷 *Photo de référence :* envoyée\n` : '') +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `_Commande via elirisart.com_`
-  );
-  window.open('https://wa.me/243995562489?text=' + msg, '_blank');
+  showToast('✅ Commande créée ! Payez l\'acompte dans votre messagerie.');
+  setTimeout(() => showPage('messages'), 1200);
 }
 
 // ══════════════════════════════════════
@@ -3118,16 +3110,23 @@ async function loadAdminMessages(orderId) {
     const isAdmin  = m.sender === 'admin';
     const isSystem = m.sender === 'system';
     if (isSystem) return `<div style="text-align:center; font-size:0.7rem; color:var(--gold); background:rgba(201,168,76,0.08); padding:0.6rem 1rem; border-radius:4px;">${m.text}</div>`;
-    return `<div style="display:flex; flex-direction:column; align-items:${isAdmin ? 'flex-end' : 'flex-start'};">
-      <div style="max-width:75%; background:${isAdmin ? 'var(--blue-mid)' : '#0A1628'}; border:1px solid ${isAdmin ? 'transparent' : 'rgba(255,255,255,0.08)'}; padding:0.7rem 1rem; border-radius:4px;">
+    return `<div style="display:flex; flex-direction:column; align-items:${isAdmin ? 'flex-end' : 'flex-start'}; position:relative;" onmouseover="this.querySelector('.del-btn')&&(this.querySelector('.del-btn').style.opacity='1')" onmouseout="this.querySelector('.del-btn')&&(this.querySelector('.del-btn').style.opacity='0')">
+      <div style="max-width:75%; background:${isAdmin ? 'var(--blue-mid)' : '#0A1628'}; border:1px solid ${isAdmin ? 'transparent' : 'rgba(255,255,255,0.08)'}; padding:0.7rem 1rem; border-radius:4px; position:relative;">
         <div style="font-size:0.65rem; color:${isAdmin ? 'rgba(255,255,255,0.6)' : 'var(--gold)'}; margin-bottom:0.3rem;">${isAdmin ? 'Vous' : 'Client'}</div>
         ${m.image ? `<img src="${m.image}" style="max-width:200px; max-height:200px; object-fit:contain; display:block; margin-bottom:${m.text?'0.5rem':'0'}; cursor:pointer;" onclick="window.open(this.src,'_blank')">` : ''}
         ${m.text ? `<div style="font-size:0.85rem; color:var(--white); line-height:1.5;">${m.text}</div>` : ''}
         ${m.image ? `<a href="${m.image}" download="photo-commande.jpg" style="display:inline-block; margin-top:0.4rem; font-size:0.6rem; color:var(--gold); text-decoration:none; letter-spacing:0.08em; text-transform:uppercase;">⬇ Télécharger</a>` : ''}
       </div>
+      <button class="del-btn" onclick="deleteAdminMessage('${m.id}')" style="opacity:0; transition:opacity 0.2s; background:rgba(192,57,43,0.15); border:1px solid rgba(192,57,43,0.3); color:#e74c3c; font-size:0.55rem; padding:0.15rem 0.5rem; cursor:pointer; margin-top:0.2rem; font-family:'Josefin Sans',sans-serif; letter-spacing:0.08em;">🗑 Supprimer</button>
     </div>`;
   }).join('');
   msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+async function deleteAdminMessage(msgId) {
+  if (!confirm('Supprimer ce message ?')) return;
+  await _adminCall('delete_message', { id: msgId });
+  await loadAdminMessages(_adminActiveOrderId);
 }
 
 async function sendAdminMessage() {
@@ -3245,9 +3244,19 @@ async function authSignup() {
   errEl.style.display = 'none'; okEl.style.display = 'none';
   if (!name || !email || !pwd) { errEl.textContent = 'Remplissez tous les champs.'; errEl.style.display = 'block'; return; }
   if (pwd.length < 6) { errEl.textContent = 'Mot de passe minimum 6 caractères.'; errEl.style.display = 'block'; return; }
-  const { error } = await _supa.auth.signUp({ email, password: pwd, options: { data: { full_name: name, phone } } });
+  const { data, error } = await _supa.auth.signUp({ email, password: pwd, options: { data: { full_name: name, phone } } });
   if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return; }
-  okEl.style.display = 'block';
+  // Connexion automatique après inscription
+  if (data.session) {
+    showPage('messages');
+  } else {
+    // Si email confirmation activé, connecte directement
+    const { error: loginErr } = await _supa.auth.signInWithPassword({ email, password: pwd });
+    if (!loginErr) { showPage('messages'); return; }
+    okEl.textContent = '✅ Compte créé ! Connectez-vous maintenant.';
+    okEl.style.display = 'block';
+    switchAuthTab('login');
+  }
 }
 
 async function authLogout() {
