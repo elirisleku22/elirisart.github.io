@@ -1159,7 +1159,8 @@ document.addEventListener('DOMContentLoaded', _initSupabase);
     <li><a href="#" onclick="showPage('blog')">Blog</a></li>
     <li><a href="#" onclick="showPage('contact')">Contact</a></li>
     <li><a href="#" class="nav-cta" onclick="showPage('pricing')">Commander</a></li>
-    <li><a href="#" onclick="goToMessages()" id="navMessagesLink" style="display:none;">💬 Mes Commandes</a></li>
+    <li><a href="#" onclick="goToMessages()" id="navMessagesLink" style="color:var(--gold);">💬 Mes Commandes</a></li>
+    <li><a href="#" onclick="showPage('auth')" id="navAccountLink" style="color:rgba(255,255,255,0.6); font-size:0.78rem;">👤 Mon Compte</a></li>
     <li><a href="#" onclick="showPage('admin')" style="opacity:0.3; font-size:0.6rem;">⚙</a></li>
   </ul>
   <!-- Hamburger (mobile only) -->
@@ -1177,7 +1178,8 @@ document.addEventListener('DOMContentLoaded', _initSupabase);
   <a href="#" onclick="mobileNav('testimonials')">Témoignages</a>
   <a href="#" onclick="mobileNav('blog')">Blog</a>
   <a href="#" onclick="mobileNav('contact')">Contact</a>
-  <a href="#" onclick="goToMessages()" id="mobileMessagesLink" style="display:none;">💬 Mes Commandes</a>
+  <a href="#" onclick="goToMessages()" id="mobileMessagesLink" style="color:var(--gold);">💬 Mes Commandes</a>
+  <a href="#" onclick="mobileNav('auth')" id="mobileAccountLink">👤 Mon Compte</a>
   <a href="#" class="cta-mobile" onclick="mobileNav('pricing')">🎨 Commander</a>
   <a href="#" class="admin-mobile" onclick="mobileNav('admin')">⚙ Administration</a>
 </div>
@@ -1784,6 +1786,54 @@ document.addEventListener('DOMContentLoaded', _initSupabase);
 
       </div><!-- /container -->
     </section>
+
+    <!-- ═══════════════ MESSAGES ADMIN ═══════════════ -->
+    <section class="section section-dark" style="padding:4rem 0;">
+      <div class="container">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <div class="section-label">Messagerie</div>
+            <h3 style="font-family:'Cormorant Garamond',serif; font-size:1.8rem; color:var(--white); font-weight:300;">Messages des Clients</h3>
+          </div>
+          <button onclick="loadAdminConversations()" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.7); font-family:'Josefin Sans',sans-serif; font-size:0.68rem; padding:0.6rem 1.4rem; cursor:pointer; letter-spacing:0.1em; text-transform:uppercase;">🔄 Actualiser</button>
+        </div>
+
+        <div style="display:grid; grid-template-columns:280px 1fr; gap:1.5rem; min-height:500px;">
+
+          <!-- Liste des conversations -->
+          <div id="adminConvList" style="background:#0A1628; border:1px solid rgba(255,255,255,0.08); overflow-y:auto; max-height:600px;">
+            <div style="color:rgba(255,255,255,0.2); font-size:0.8rem; padding:2rem; text-align:center;">Cliquez sur Actualiser</div>
+          </div>
+
+          <!-- Conversation active -->
+          <div id="adminConvPanel" style="background:#0A1628; border:1px solid rgba(255,255,255,0.08); display:flex; flex-direction:column;">
+            <div id="adminConvEmpty" style="display:flex; align-items:center; justify-content:center; height:100%; color:rgba(255,255,255,0.2); font-size:0.85rem; padding:3rem;">
+              Sélectionnez une conversation
+            </div>
+
+            <!-- Messages zone -->
+            <div id="adminMsgsZone" style="display:none; flex-direction:column; height:100%;">
+              <div id="adminConvHeader" style="padding:1rem 1.5rem; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+              </div>
+              <div id="adminMsgsList" style="flex:1; overflow-y:auto; padding:1.5rem; display:flex; flex-direction:column; gap:0.8rem; max-height:380px;">
+              </div>
+              <!-- Input admin -->
+              <div style="padding:1rem 1.5rem; border-top:1px solid rgba(255,255,255,0.08); display:flex; gap:0.8rem; align-items:flex-end;">
+                <textarea id="adminMsgInput" placeholder="Écrire un message..." style="flex:1; background:#020E1F; border:1px solid rgba(255,255,255,0.12); color:var(--white); padding:0.7rem; font-family:'Josefin Sans',sans-serif; font-size:0.8rem; resize:none; min-height:60px;" onkeydown="if(event.ctrlKey&&event.key==='Enter')sendAdminMessage()"></textarea>
+                <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                  <button onclick="sendAdminMessage()" style="background:var(--gold); border:none; color:var(--blue-deep); font-family:'Josefin Sans',sans-serif; font-size:0.65rem; padding:0.6rem 1rem; cursor:pointer; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; white-space:nowrap;">Envoyer</button>
+                  <label style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.6); font-family:'Josefin Sans',sans-serif; font-size:0.6rem; padding:0.5rem 0.8rem; cursor:pointer; letter-spacing:0.08em; text-align:center; text-transform:uppercase;">
+                    📎 Image
+                    <input type="file" accept="image/*" style="display:none" onchange="sendAdminImage(this)">
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </div><!-- /adminDashboard -->
 </div><!-- /page-admin -->
 
@@ -2997,7 +3047,121 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <script>
 // ══════════════════════════════════════════════════════
-// AUTH SYSTEM (Supabase Auth)
+// MESSAGERIE ADMIN
+// ══════════════════════════════════════════════════════
+let _adminActiveOrderId = null;
+let _adminMsgsChannel   = null;
+
+async function loadAdminConversations() {
+  const listEl = document.getElementById('adminConvList');
+  listEl.innerHTML = '<div style="color:rgba(255,255,255,0.3); font-size:0.8rem; padding:1.5rem; text-align:center;">Chargement...</div>';
+  try {
+    const { orders } = await _adminCall('get_orders');
+    if (!orders || orders.length === 0) {
+      listEl.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:0.8rem; padding:2rem; text-align:center;">Aucune commande</div>';
+      return;
+    }
+    listEl.innerHTML = orders.map(o => {
+      const payBadge = o.payment_status === 'confirmed' ? '✅' : o.payment_status === 'pending' ? '⏳' : '💳';
+      return `<div onclick="openAdminConv('${o.id}','${o.order_num}','${o.name}',${o.amount},'${o.payment_status||'unpaid'}')"
+        style="padding:1rem 1.2rem; border-bottom:1px solid rgba(255,255,255,0.06); cursor:pointer; transition:background 0.2s;"
+        onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='none'">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+          <div style="font-size:0.65rem; color:var(--gold); letter-spacing:0.1em;">${o.order_num}</div>
+          <div style="font-size:0.75rem;">${payBadge}</div>
+        </div>
+        <div style="font-size:0.85rem; color:var(--white); font-weight:500;">${o.name}</div>
+        <div style="font-size:0.7rem; color:rgba(255,255,255,0.4); margin-top:0.2rem;">${o.format} — ${o.amount}$</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    listEl.innerHTML = '<div style="color:#e74c3c; font-size:0.8rem; padding:2rem;">Erreur de chargement</div>';
+  }
+}
+
+async function openAdminConv(orderId, orderNum, clientName, amount, payStatus) {
+  _adminActiveOrderId = orderId;
+  document.getElementById('adminConvEmpty').style.display = 'none';
+  document.getElementById('adminMsgsZone').style.display  = 'flex';
+
+  // Header
+  const payLabel = payStatus === 'confirmed' ? '<span style="color:#4ade80; font-size:0.7rem;">✅ Acompte confirmé</span>' :
+                   payStatus === 'pending'   ? `<span style="color:var(--gold); font-size:0.7rem;">⏳ Paiement à confirmer</span> <button onclick="confirmAdminPayment('${orderId}')" style="background:#4ade80; border:none; color:#020E1F; font-size:0.6rem; padding:0.3rem 0.8rem; cursor:pointer; font-family:'Josefin Sans',sans-serif; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; margin-left:0.5rem;">✓ Confirmer</button>` :
+                   '<span style="color:rgba(255,255,255,0.3); font-size:0.7rem;">💳 Non payé</span>';
+
+  document.getElementById('adminConvHeader').innerHTML = `
+    <div>
+      <div style="font-size:0.65rem; color:var(--gold); letter-spacing:0.15em; margin-bottom:0.2rem;">${orderNum}</div>
+      <div style="font-size:1rem; color:var(--white);">${clientName} — ${amount}$</div>
+    </div>
+    <div>${payLabel}</div>
+  `;
+
+  await loadAdminMessages(orderId);
+
+  // Écoute temps réel
+  if (_adminMsgsChannel) _adminMsgsChannel.unsubscribe();
+  _adminMsgsChannel = _supa.channel('admin-msgs-' + orderId)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `order_id=eq.${orderId}` },
+      () => loadAdminMessages(orderId))
+    .subscribe();
+}
+
+async function loadAdminMessages(orderId) {
+  const msgsEl = document.getElementById('adminMsgsList');
+  const { data: msgs } = await _supa.from('messages').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
+  if (!msgs || msgs.length === 0) {
+    msgsEl.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:0.8rem; text-align:center; padding:2rem;">Aucun message — commencez la conversation</div>';
+    return;
+  }
+  msgsEl.innerHTML = msgs.map(m => {
+    const isAdmin  = m.sender === 'admin';
+    const isSystem = m.sender === 'system';
+    if (isSystem) return `<div style="text-align:center; font-size:0.7rem; color:var(--gold); background:rgba(201,168,76,0.08); padding:0.6rem 1rem; border-radius:4px;">${m.text}</div>`;
+    return `<div style="display:flex; flex-direction:column; align-items:${isAdmin ? 'flex-end' : 'flex-start'};">
+      <div style="max-width:75%; background:${isAdmin ? 'var(--blue-mid)' : '#0A1628'}; border:1px solid ${isAdmin ? 'transparent' : 'rgba(255,255,255,0.08)'}; padding:0.7rem 1rem; border-radius:4px;">
+        <div style="font-size:0.65rem; color:${isAdmin ? 'rgba(255,255,255,0.6)' : 'var(--gold)'}; margin-bottom:0.3rem;">${isAdmin ? 'Vous' : 'Client'}</div>
+        ${m.image ? `<img src="${m.image}" style="max-width:200px; max-height:200px; object-fit:contain; display:block; margin-bottom:${m.text?'0.5rem':'0'}; cursor:pointer;" onclick="window.open(this.src,'_blank')">` : ''}
+        ${m.text ? `<div style="font-size:0.85rem; color:var(--white); line-height:1.5;">${m.text}</div>` : ''}
+        ${m.image ? `<a href="${m.image}" download="photo-commande.jpg" style="display:inline-block; margin-top:0.4rem; font-size:0.6rem; color:var(--gold); text-decoration:none; letter-spacing:0.08em; text-transform:uppercase;">⬇ Télécharger</a>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+async function sendAdminMessage() {
+  const input = document.getElementById('adminMsgInput');
+  const text  = input.value.trim();
+  if (!text || !_adminActiveOrderId) return;
+  input.value = '';
+  await _adminCall('send_admin_message', { order_id: _adminActiveOrderId, text });
+}
+
+async function sendAdminImage(fileInput) {
+  const file = fileInput.files[0];
+  if (!file || !_adminActiveOrderId) return;
+  const compressed = await compressImage(file, 0.80, 1200);
+  await _adminCall('send_admin_message', { order_id: _adminActiveOrderId, image: compressed });
+  fileInput.value = '';
+}
+
+async function confirmAdminPayment(orderId) {
+  if (!confirm('Confirmer le paiement de l\'acompte pour cette commande ?')) return;
+  await _adminCall('confirm_payment', { order_id: orderId });
+  // Message automatique
+  await _adminCall('send_admin_message', {
+    order_id: orderId,
+    text: '✅ Votre acompte a été confirmé ! Votre commande est maintenant en cours. Je vous tiendrai informé de l\'avancement. Merci de votre confiance — Élirïs\'Art'
+  });
+  showToast('✅ Paiement confirmé !');
+  await loadAdminConversations();
+  // Recharge la conv
+  const order = window._orders.find(o => o.id === orderId);
+  if (order) openAdminConv(orderId, order.order_num, order.name, order.amount, 'confirmed');
+}
+
+// ══════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════
 window._currentUser  = null;
 window._currentOrder = null;
@@ -3014,14 +3178,12 @@ _supa.auth.onAuthStateChange((event, session) => {
 
 function _onLogin(user) {
   window._currentUser = user;
-  document.getElementById('navMessagesLink').style.display = 'inline';
-  document.getElementById('mobileMessagesLink').style.display = 'block';
+  updateNavAuth();
 }
 
 function _onLogout() {
   window._currentUser = null;
-  document.getElementById('navMessagesLink').style.display = 'none';
-  document.getElementById('mobileMessagesLink').style.display = 'none';
+  updateNavAuth();
 }
 
 function goToMessages() {
@@ -3041,6 +3203,25 @@ function switchAuthTab(tab) {
 function renderAuthPage() {
   if (window._currentUser) { showPage('messages'); return; }
   switchAuthTab('login');
+}
+
+function updateNavAuth() {
+  const user = window._currentUser;
+  const accountLink = document.getElementById('navAccountLink');
+  const mobileAccountLink = document.getElementById('mobileAccountLink');
+  const messagesLink = document.getElementById('navMessagesLink');
+  const mobileMessagesLink = document.getElementById('mobileMessagesLink');
+  if (user) {
+    if (accountLink) { accountLink.textContent = '👤 ' + (user.user_metadata?.full_name || user.email).split(' ')[0]; accountLink.onclick = () => showPage('messages'); }
+    if (mobileAccountLink) { mobileAccountLink.textContent = '👤 ' + (user.user_metadata?.full_name || user.email).split(' ')[0]; mobileAccountLink.onclick = () => { showPage('messages'); toggleMobileMenu(); }; }
+    if (messagesLink) messagesLink.style.display = 'block';
+    if (mobileMessagesLink) mobileMessagesLink.style.display = 'block';
+  } else {
+    if (accountLink) { accountLink.textContent = '👤 Mon Compte'; accountLink.onclick = () => showPage('auth'); }
+    if (mobileAccountLink) { mobileAccountLink.textContent = '👤 Mon Compte'; mobileAccountLink.onclick = () => { showPage('auth'); toggleMobileMenu(); }; }
+    if (messagesLink) messagesLink.style.display = 'none';
+    if (mobileMessagesLink) mobileMessagesLink.style.display = 'none';
+  }
 }
 
 async function authLogin() {
