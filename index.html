@@ -1159,6 +1159,7 @@ document.addEventListener('DOMContentLoaded', _initSupabase);
     <li><a href="#" onclick="showPage('blog')">Blog</a></li>
     <li><a href="#" onclick="showPage('contact')">Contact</a></li>
     <li><a href="#" class="nav-cta" onclick="showPage('pricing')">Commander</a></li>
+    <li><a href="#" onclick="goToMessages()" id="navMessagesLink" style="display:none;">💬 Mes Commandes</a></li>
     <li><a href="#" onclick="showPage('admin')" style="opacity:0.3; font-size:0.6rem;">⚙</a></li>
   </ul>
   <!-- Hamburger (mobile only) -->
@@ -1176,6 +1177,7 @@ document.addEventListener('DOMContentLoaded', _initSupabase);
   <a href="#" onclick="mobileNav('testimonials')">Témoignages</a>
   <a href="#" onclick="mobileNav('blog')">Blog</a>
   <a href="#" onclick="mobileNav('contact')">Contact</a>
+  <a href="#" onclick="goToMessages()" id="mobileMessagesLink" style="display:none;">💬 Mes Commandes</a>
   <a href="#" class="cta-mobile" onclick="mobileNav('pricing')">🎨 Commander</a>
   <a href="#" class="admin-mobile" onclick="mobileNav('admin')">⚙ Administration</a>
 </div>
@@ -1969,10 +1971,10 @@ function showPage(pageId) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   if (pageId === 'admin') initAdminPage();
-  // Re-render blog each time blog page is shown (fixes mobile empty blog bug)
   if (pageId === 'blog') renderBlogPage();
-  // Re-render gallery each time gallery page is shown
   if (pageId === 'gallery') { renderGalleryPage(); renderHomeGallery(); }
+  if (pageId === 'messages') initMessagesPage();
+  if (pageId === 'auth') renderAuthPage();
 }
 
 // ══════════════════════════════════════
@@ -2165,7 +2167,8 @@ async function loadOrderPhotos() {
 
 // ══════════════════════════════════════
 async function saveLog(data) {
-  // Les clients peuvent insérer des commandes (RLS le permet)
+  const session = (await _supa.auth.getSession()).data.session;
+  const clientEmail = session?.user?.email || null;
   await _supa.from('orders').insert({
     order_num: data.orderNum,
     date: new Date().toLocaleString('fr-FR'),
@@ -2175,6 +2178,8 @@ async function saveLog(data) {
     amount: data.amount,
     description: data.desc || '',
     status: 'new',
+    payment_status: 'unpaid',
+    client_email: clientEmail,
     created_at: Date.now()
   });
 }
@@ -2848,6 +2853,532 @@ document.addEventListener('DOMContentLoaded', () => {
   const bannerTextEl = document.getElementById('bannerText');
   if (bannerTextEl) bannerTextEl.addEventListener('input', updateBannerPreview);
 });
+</script>
+
+<!-- ════════════════ PAGE: AUTH ════════════════ -->
+<div id="page-auth" class="page">
+  <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; background:#020E1F; padding:2rem; padding-top:90px;">
+    <div style="background:#0A1628; border:1px solid rgba(201,168,76,0.2); padding:3rem; max-width:440px; width:100%; text-align:center;">
+      <img src="file.png" alt="Élirïs'Art" style="height:70px; width:auto; object-fit:contain; margin-bottom:0.5rem;">
+      <div id="authTabs" style="display:flex; border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:2rem; margin-top:1.5rem;">
+        <button onclick="switchAuthTab('login')" id="tabLogin" style="flex:1; padding:0.7rem; background:none; border:none; color:var(--gold); font-family:'Josefin Sans',sans-serif; font-size:0.7rem; letter-spacing:0.15em; text-transform:uppercase; cursor:pointer; border-bottom:2px solid var(--gold);">Connexion</button>
+        <button onclick="switchAuthTab('signup')" id="tabSignup" style="flex:1; padding:0.7rem; background:none; border:none; color:rgba(255,255,255,0.4); font-family:'Josefin Sans',sans-serif; font-size:0.7rem; letter-spacing:0.15em; text-transform:uppercase; cursor:pointer; border-bottom:2px solid transparent;">Créer un compte</button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div id="authLoginForm">
+        <div style="text-align:left; margin-bottom:1rem;">
+          <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Email</label>
+          <input type="email" id="loginEmail" class="form-input-dark" placeholder="votre@email.com">
+        </div>
+        <div style="text-align:left; margin-bottom:1.5rem;">
+          <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Mot de passe</label>
+          <input type="password" id="loginPwd" class="form-input-dark" placeholder="••••••••" onkeydown="if(event.key==='Enter')authLogin()">
+        </div>
+        <div id="loginError" style="color:#e74c3c; font-size:0.78rem; margin-bottom:1rem; display:none;"></div>
+        <button class="btn-gold" style="width:100%; padding:0.9rem;" onclick="authLogin()">Se Connecter</button>
+        <p style="font-size:0.75rem; color:rgba(255,255,255,0.3); margin-top:1rem;">Pas encore de compte ? <a href="#" onclick="switchAuthTab('signup')" style="color:var(--gold);">Créer un compte</a></p>
+      </div>
+
+      <!-- SIGNUP FORM -->
+      <div id="authSignupForm" style="display:none;">
+        <div style="text-align:left; margin-bottom:1rem;">
+          <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Nom complet</label>
+          <input type="text" id="signupName" class="form-input-dark" placeholder="Votre nom">
+        </div>
+        <div style="text-align:left; margin-bottom:1rem;">
+          <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Email</label>
+          <input type="email" id="signupEmail" class="form-input-dark" placeholder="votre@email.com">
+        </div>
+        <div style="text-align:left; margin-bottom:1rem;">
+          <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Numéro WhatsApp</label>
+          <input type="tel" id="signupPhone" class="form-input-dark" placeholder="+243 000 000 000">
+        </div>
+        <div style="text-align:left; margin-bottom:1.5rem;">
+          <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Mot de passe</label>
+          <input type="password" id="signupPwd" class="form-input-dark" placeholder="Minimum 6 caractères">
+        </div>
+        <div id="signupError" style="color:#e74c3c; font-size:0.78rem; margin-bottom:1rem; display:none;"></div>
+        <div id="signupSuccess" style="color:#4ade80; font-size:0.78rem; margin-bottom:1rem; display:none;">✅ Compte créé ! Vérifiez votre email pour confirmer.</div>
+        <button class="btn-gold" style="width:100%; padding:0.9rem;" onclick="authSignup()">Créer Mon Compte</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ PAGE: MESSAGES ════════════════ -->
+<div id="page-messages" class="page">
+  <div style="min-height:100vh; background:#020E1F; padding:2rem; padding-top:90px;">
+    <div style="max-width:900px; margin:0 auto;">
+
+      <!-- Header -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem; flex-wrap:wrap; gap:1rem;">
+        <div>
+          <div class="section-label">Espace Client</div>
+          <h2 style="font-family:'Cormorant Garamond',serif; font-size:2.2rem; color:var(--white); font-weight:300;">Mes Commandes & Messages</h2>
+        </div>
+        <button onclick="authLogout()" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.5); font-family:'Josefin Sans',sans-serif; font-size:0.68rem; padding:0.6rem 1.2rem; cursor:pointer; letter-spacing:0.1em; text-transform:uppercase;">Déconnexion</button>
+      </div>
+
+      <!-- Orders list -->
+      <div id="clientOrdersList" style="margin-bottom:3rem;">
+        <div style="color:rgba(255,255,255,0.3); font-size:0.85rem; padding:2rem; text-align:center;">Chargement...</div>
+      </div>
+
+      <!-- Active conversation -->
+      <div id="clientConversation" style="display:none;">
+        <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem; padding-bottom:1rem; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <button onclick="closeConversation()" style="background:none; border:none; color:var(--gold); cursor:pointer; font-size:1.2rem;">←</button>
+          <div>
+            <div id="convOrderNum" style="font-size:0.7rem; color:var(--gold); letter-spacing:0.15em;"></div>
+            <div id="convOrderInfo" style="font-size:0.9rem; color:var(--white);"></div>
+          </div>
+          <div id="convPaymentBadge" style="margin-left:auto;"></div>
+        </div>
+
+        <!-- Payment section -->
+        <div id="convPaymentSection" style="background:#0A1628; border:1px solid rgba(201,168,76,0.25); padding:1.5rem; margin-bottom:1.5rem; display:none;">
+          <div style="font-size:0.65rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:1rem;">💳 Paiement de l'Acompte (50%)</div>
+          <div id="convAcompteInfo" style="font-size:0.9rem; color:rgba(255,255,255,0.8); margin-bottom:1.2rem; line-height:1.8;"></div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.2rem;">
+            <div style="background:rgba(255,107,107,0.08); border:1px solid rgba(255,107,107,0.2); padding:1rem; text-align:center;">
+              <div style="font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase; color:#ff6b6b; margin-bottom:0.5rem;">Airtel Money</div>
+              <div style="font-size:1.1rem; color:var(--white); font-weight:600;">+243 995 562 489</div>
+              <div style="font-size:0.7rem; color:rgba(255,255,255,0.4); margin-top:0.3rem;">Élie LEKU</div>
+            </div>
+            <div style="background:rgba(76,175,80,0.08); border:1px solid rgba(76,175,80,0.2); padding:1rem; text-align:center;">
+              <div style="font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase; color:#4CAF50; margin-bottom:0.5rem;">M-Pesa</div>
+              <div style="font-size:1.1rem; color:var(--white); font-weight:600;">+243 820 603 485</div>
+              <div style="font-size:0.7rem; color:rgba(255,255,255,0.4); margin-top:0.3rem;">Élie LEKU</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Méthode de paiement utilisée</label>
+            <select id="payMethod" class="form-input-dark" style="cursor:pointer;">
+              <option value="airtel">Airtel Money</option>
+              <option value="mpesa">M-Pesa</option>
+            </select>
+          </div>
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">Référence / Code de transaction</label>
+            <input type="text" id="payRef" class="form-input-dark" placeholder="Ex: MP123456789">
+          </div>
+          <button onclick="submitPayment()" style="background:var(--gold); border:none; color:var(--blue-deep); font-family:'Josefin Sans',sans-serif; font-size:0.72rem; font-weight:600; padding:0.8rem 2rem; cursor:pointer; letter-spacing:0.15em; text-transform:uppercase; width:100%;">✅ Confirmer Mon Paiement</button>
+        </div>
+
+        <!-- Messages -->
+        <div id="convMessages" style="min-height:300px; max-height:450px; overflow-y:auto; padding:1rem; background:#0A1628; border:1px solid rgba(255,255,255,0.06); margin-bottom:1rem; display:flex; flex-direction:column; gap:0.8rem;">
+          <div style="color:rgba(255,255,255,0.2); font-size:0.8rem; text-align:center; padding:2rem;">Chargement des messages...</div>
+        </div>
+
+        <!-- Invoice download -->
+        <div id="convInvoiceBtn" style="display:none; margin-bottom:1rem;">
+          <button onclick="downloadInvoice()" style="background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.3); color:#4ade80; font-family:'Josefin Sans',sans-serif; font-size:0.7rem; padding:0.7rem 1.5rem; cursor:pointer; letter-spacing:0.1em; text-transform:uppercase; width:100%;">📄 Télécharger ma Facture</button>
+        </div>
+
+        <!-- Message input -->
+        <div id="convInputArea" style="border:1px solid rgba(255,255,255,0.1); background:#0A1628;">
+          <div style="display:flex; align-items:flex-end; gap:0.5rem; padding:0.8rem;">
+            <textarea id="convMsgInput" rows="2" placeholder="Écrivez votre message..." style="flex:1; background:transparent; border:none; color:rgba(255,255,255,0.8); font-family:'Josefin Sans',sans-serif; font-size:0.85rem; resize:none; outline:none; line-height:1.5;"></textarea>
+            <div style="display:flex; flex-direction:column; gap:0.4rem;">
+              <button onclick="document.getElementById('convImgInput').click()" title="Envoyer une image" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.5); width:36px; height:36px; cursor:pointer; font-size:1rem;">📷</button>
+              <button onclick="sendMessage()" style="background:var(--gold); border:none; color:var(--blue-deep); width:36px; height:36px; cursor:pointer; font-size:1rem; font-weight:700;">→</button>
+            </div>
+          </div>
+          <input type="file" id="convImgInput" accept="image/*" style="display:none" onchange="sendImageMessage(this)">
+          <div id="convImgPreviewBar" style="display:none; padding:0.5rem 0.8rem; border-top:1px solid rgba(255,255,255,0.06); font-size:0.72rem; color:rgba(255,255,255,0.4);"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// AUTH SYSTEM (Supabase Auth)
+// ══════════════════════════════════════════════════════
+window._currentUser  = null;
+window._currentOrder = null;
+
+// Vérifie la session au chargement
+_supa.auth.getSession().then(({ data: { session } }) => {
+  if (session) _onLogin(session.user);
+});
+
+_supa.auth.onAuthStateChange((event, session) => {
+  if (session) _onLogin(session.user);
+  else _onLogout();
+});
+
+function _onLogin(user) {
+  window._currentUser = user;
+  document.getElementById('navMessagesLink').style.display = 'inline';
+  document.getElementById('mobileMessagesLink').style.display = 'block';
+}
+
+function _onLogout() {
+  window._currentUser = null;
+  document.getElementById('navMessagesLink').style.display = 'none';
+  document.getElementById('mobileMessagesLink').style.display = 'none';
+}
+
+function goToMessages() {
+  if (!window._currentUser) { showPage('auth'); return; }
+  showPage('messages');
+}
+
+function switchAuthTab(tab) {
+  document.getElementById('authLoginForm').style.display  = tab === 'login'  ? 'block' : 'none';
+  document.getElementById('authSignupForm').style.display = tab === 'signup' ? 'block' : 'none';
+  document.getElementById('tabLogin').style.color  = tab === 'login'  ? 'var(--gold)' : 'rgba(255,255,255,0.4)';
+  document.getElementById('tabSignup').style.color = tab === 'signup' ? 'var(--gold)' : 'rgba(255,255,255,0.4)';
+  document.getElementById('tabLogin').style.borderBottomColor  = tab === 'login'  ? 'var(--gold)' : 'transparent';
+  document.getElementById('tabSignup').style.borderBottomColor = tab === 'signup' ? 'var(--gold)' : 'transparent';
+}
+
+function renderAuthPage() {
+  if (window._currentUser) { showPage('messages'); return; }
+  switchAuthTab('login');
+}
+
+async function authLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd   = document.getElementById('loginPwd').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+  if (!email || !pwd) { errEl.textContent = 'Remplissez tous les champs.'; errEl.style.display = 'block'; return; }
+  const { error } = await _supa.auth.signInWithPassword({ email, password: pwd });
+  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return; }
+  showPage('messages');
+}
+
+async function authSignup() {
+  const name  = document.getElementById('signupName').value.trim();
+  const email = document.getElementById('signupEmail').value.trim();
+  const phone = document.getElementById('signupPhone').value.trim();
+  const pwd   = document.getElementById('signupPwd').value;
+  const errEl = document.getElementById('signupError');
+  const okEl  = document.getElementById('signupSuccess');
+  errEl.style.display = 'none'; okEl.style.display = 'none';
+  if (!name || !email || !pwd) { errEl.textContent = 'Remplissez tous les champs.'; errEl.style.display = 'block'; return; }
+  if (pwd.length < 6) { errEl.textContent = 'Mot de passe minimum 6 caractères.'; errEl.style.display = 'block'; return; }
+  const { error } = await _supa.auth.signUp({ email, password: pwd, options: { data: { full_name: name, phone } } });
+  if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return; }
+  okEl.style.display = 'block';
+}
+
+async function authLogout() {
+  await _supa.auth.signOut();
+  showPage('home');
+}
+
+// ══════════════════════════════════════════════════════
+// MESSAGES & COMMANDES CLIENT
+// ══════════════════════════════════════════════════════
+async function initMessagesPage() {
+  if (!window._currentUser) { showPage('auth'); return; }
+  document.getElementById('clientConversation').style.display = 'none';
+  await loadClientOrders();
+}
+
+async function loadClientOrders() {
+  const listEl = document.getElementById('clientOrdersList');
+  listEl.innerHTML = '<div style="color:rgba(255,255,255,0.3); text-align:center; padding:2rem;">Chargement...</div>';
+  try {
+    const res = await fetch('/api/client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get_my_orders', token: (await _supa.auth.getSession()).data.session?.access_token })
+    });
+    const { orders } = await res.json();
+    if (!orders || orders.length === 0) {
+      listEl.innerHTML = `
+        <div style="text-align:center; padding:3rem; color:rgba(255,255,255,0.3);">
+          <div style="font-size:2rem; margin-bottom:1rem;">🎨</div>
+          <div style="font-size:0.9rem;">Vous n'avez pas encore de commande.</div>
+          <button onclick="showPage('pricing')" style="margin-top:1.5rem; background:var(--gold); border:none; color:var(--blue-deep); font-family:'Josefin Sans',sans-serif; font-size:0.7rem; font-weight:600; padding:0.7rem 1.8rem; cursor:pointer; letter-spacing:0.15em; text-transform:uppercase;">Commander un Portrait</button>
+        </div>`;
+      return;
+    }
+    listEl.innerHTML = `
+      <div style="font-size:0.65rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--text-muted); margin-bottom:1rem;">Vos Commandes</div>
+      ${orders.map(o => {
+        const statusColor = o.payment_status === 'confirmed' ? '#4ade80' : o.payment_status === 'pending' ? '#facc15' : '#f87171';
+        const statusLabel = o.payment_status === 'confirmed' ? '✅ Acompte confirmé' : o.payment_status === 'pending' ? '⏳ En attente de confirmation' : '💳 Acompte requis';
+        return `
+        <div onclick="openConversation('${o.id}')" style="background:#0A1628; border:1px solid rgba(255,255,255,0.08); padding:1.2rem 1.5rem; margin-bottom:0.8rem; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:1rem; transition:border-color 0.2s;" onmouseover="this.style.borderColor='rgba(201,168,76,0.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'">
+          <div>
+            <div style="font-size:0.7rem; color:var(--gold); letter-spacing:0.1em; margin-bottom:0.2rem;">${o.order_num}</div>
+            <div style="font-size:0.95rem; color:var(--white);">Portrait ${o.format} — ${o.amount} $</div>
+            <div style="font-size:0.75rem; color:rgba(255,255,255,0.4); margin-top:0.2rem;">${o.date}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:0.68rem; color:${statusColor}; white-space:nowrap;">${statusLabel}</div>
+            <div style="font-size:0.7rem; color:rgba(255,255,255,0.3); margin-top:0.4rem;">💬 Ouvrir →</div>
+          </div>
+        </div>`;
+      }).join('')}`;
+  } catch(e) {
+    listEl.innerHTML = '<div style="color:#e74c3c; padding:2rem; text-align:center;">Erreur de chargement.</div>';
+  }
+}
+
+async function openConversation(orderId) {
+  const res = await fetch('/api/client', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get_order', id: orderId, token: (await _supa.auth.getSession()).data.session?.access_token })
+  });
+  const { order } = await res.json();
+  if (!order) return;
+  window._currentOrder = order;
+
+  document.getElementById('clientOrdersList').style.display = 'none';
+  document.getElementById('clientConversation').style.display = 'block';
+  document.getElementById('convOrderNum').textContent = order.order_num;
+  document.getElementById('convOrderInfo').textContent = `Portrait ${order.format} — ${order.amount} $`;
+
+  // Payment badge
+  const badge = document.getElementById('convPaymentBadge');
+  if (order.payment_status === 'confirmed') {
+    badge.innerHTML = '<span style="background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.3); color:#4ade80; font-size:0.65rem; padding:0.3rem 0.8rem; letter-spacing:0.1em; text-transform:uppercase;">✅ Acompte Confirmé</span>';
+    document.getElementById('convPaymentSection').style.display = 'none';
+    document.getElementById('convInvoiceBtn').style.display = 'block';
+  } else if (order.payment_status === 'pending') {
+    badge.innerHTML = '<span style="background:rgba(250,204,21,0.1); border:1px solid rgba(250,204,21,0.3); color:#facc15; font-size:0.65rem; padding:0.3rem 0.8rem; letter-spacing:0.1em; text-transform:uppercase;">⏳ En attente</span>';
+    document.getElementById('convPaymentSection').style.display = 'none';
+    document.getElementById('convInvoiceBtn').style.display = 'none';
+  } else {
+    badge.innerHTML = '<span style="background:rgba(248,113,113,0.1); border:1px solid rgba(248,113,113,0.3); color:#f87171; font-size:0.65rem; padding:0.3rem 0.8rem; letter-spacing:0.1em; text-transform:uppercase;">💳 Paiement requis</span>';
+    const acompte = Math.ceil(order.amount * 0.5);
+    document.getElementById('convAcompteInfo').innerHTML = `
+      Montant total : <strong style="color:var(--white)">${order.amount} $</strong><br>
+      Acompte à payer (50%) : <strong style="color:var(--gold); font-size:1.1rem;">${acompte} $</strong><br>
+      <span style="font-size:0.8rem; color:rgba(255,255,255,0.4);">Envoyez l'acompte via Airtel Money ou M-Pesa puis entrez la référence ci-dessous.</span>`;
+    document.getElementById('convPaymentSection').style.display = 'block';
+    document.getElementById('convInvoiceBtn').style.display = 'none';
+  }
+
+  await loadMessages(orderId);
+  // Realtime messages
+  _supa.channel('msgs-' + orderId).on('postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'messages', filter: `order_id=eq.${orderId}` },
+    () => loadMessages(orderId)
+  ).subscribe();
+}
+
+function closeConversation() {
+  document.getElementById('clientConversation').style.display = 'none';
+  document.getElementById('clientOrdersList').style.display = 'block';
+  window._currentOrder = null;
+}
+
+async function loadMessages(orderId) {
+  const { data: msgs } = await _supa.from('messages').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
+  const box = document.getElementById('convMessages');
+  if (!msgs || msgs.length === 0) {
+    box.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:0.8rem; text-align:center; padding:2rem; margin:auto;">Aucun message — commencez la conversation !</div>';
+    return;
+  }
+  box.innerHTML = msgs.map(m => {
+    const isMe = m.sender === 'client';
+    const isAdmin = m.sender === 'admin';
+    return `
+      <div style="display:flex; flex-direction:column; align-items:${isMe ? 'flex-end' : 'flex-start'};">
+        <div style="max-width:75%; background:${isMe ? 'var(--blue-mid)' : '#132238'}; padding:0.7rem 1rem; font-size:0.85rem; color:rgba(255,255,255,0.9); line-height:1.5; border-radius:2px;">
+          ${isAdmin ? '<div style="font-size:0.6rem; color:var(--gold); letter-spacing:0.1em; margin-bottom:0.3rem; text-transform:uppercase;">Élirïs\'Art</div>' : ''}
+          ${m.image ? `<img src="${m.image}" style="max-width:220px; max-height:180px; display:block; margin-bottom:${m.text ? '0.5rem' : '0'}; cursor:pointer; border-radius:2px;" onclick="downloadImg('${m.image}', 'photo-${m.id}')">` : ''}
+          ${m.text ? `<div>${m.text}</div>` : ''}
+        </div>
+        <div style="font-size:0.62rem; color:rgba(255,255,255,0.2); margin-top:0.2rem; padding:0 0.3rem;">${new Date(m.created_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })}</div>
+      </div>`;
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendMessage() {
+  const input = document.getElementById('convMsgInput');
+  const text = input.value.trim();
+  if (!text || !window._currentOrder) return;
+  input.value = '';
+  const session = (await _supa.auth.getSession()).data.session;
+  await fetch('/api/client', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'send_message', token: session?.access_token, order_id: window._currentOrder.id, text, sender: 'client' })
+  });
+}
+
+async function sendImageMessage(input) {
+  const file = input.files[0];
+  if (!file || !window._currentOrder) return;
+  const compressed = await compressImage(file, 0.85, 1400);
+  const session = (await _supa.auth.getSession()).data.session;
+  document.getElementById('convImgPreviewBar').style.display = 'block';
+  document.getElementById('convImgPreviewBar').textContent = '⏳ Envoi de l\'image...';
+  await fetch('/api/client', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'send_message', token: session?.access_token, order_id: window._currentOrder.id, image: compressed, sender: 'client' })
+  });
+  document.getElementById('convImgPreviewBar').style.display = 'none';
+  input.value = '';
+}
+
+async function submitPayment() {
+  const method = document.getElementById('payMethod').value;
+  const ref    = document.getElementById('payRef').value.trim();
+  if (!ref) { alert('Entrez la référence de votre paiement.'); return; }
+  if (!window._currentOrder) return;
+  const session = (await _supa.auth.getSession()).data.session;
+  const acompte = Math.ceil(window._currentOrder.amount * 0.5);
+  await fetch('/api/client', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'submit_payment',
+      token: session?.access_token,
+      order_id: window._currentOrder.id,
+      method, ref, acompte
+    })
+  });
+  showToast('✅ Paiement soumis — en attente de confirmation par l\'artiste');
+  document.getElementById('convPaymentSection').style.display = 'none';
+  document.getElementById('convPaymentBadge').innerHTML = '<span style="background:rgba(250,204,21,0.1); border:1px solid rgba(250,204,21,0.3); color:#facc15; font-size:0.65rem; padding:0.3rem 0.8rem; letter-spacing:0.1em; text-transform:uppercase;">⏳ En attente de confirmation</span>';
+}
+
+function downloadImg(src, name) {
+  const a = document.createElement('a');
+  a.href = src; a.download = name + '.jpg'; a.click();
+}
+
+function downloadInvoice() {
+  const o = window._currentOrder;
+  if (!o) return;
+  const acompte = Math.ceil(o.amount * 0.5);
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Facture ${o.order_num}</title>
+  <style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;color:#042C53;}h1{font-size:2rem;font-weight:300;}.gold{color:#C9A84C;}.muted{color:#888;font-size:0.8rem;}table{width:100%;border-collapse:collapse;margin-top:1.5rem;}td,th{padding:0.8rem 1rem;border-bottom:1px solid #eee;text-align:left;}th{font-size:0.7rem;text-transform:uppercase;letter-spacing:.1em;color:#888;}.total{font-size:1.4rem;color:#042C53;font-weight:600;}.badge{display:inline-block;background:#E6F1FB;color:#185FA5;padding:0.3rem 1rem;font-size:0.7rem;letter-spacing:.1em;text-transform:uppercase;}</style>
+  </head><body>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #042C53;padding-bottom:1.5rem;margin-bottom:1.5rem;">
+    <div><h1>Élirïs'Art</h1><div class="muted">Élie LEKU — Artiste Stylographe<br>Goma, Nord-Kivu, RDC<br>+243 995 562 489</div></div>
+    <div style="text-align:right;"><div class="muted">Facture N°</div><div style="font-size:1.8rem;font-weight:600;">${o.order_num}</div><div class="muted">${o.date}</div><div class="badge" style="margin-top:.5rem;">Acompte Confirmé</div></div>
+  </div>
+  <table><thead><tr><th>Prestation</th><th>Format</th><th style="text-align:right">Montant</th></tr></thead>
+  <tbody>
+  <tr><td>Portrait Réaliste au Stylo à Bille</td><td>Portrait ${o.format}</td><td style="text-align:right">${o.amount} $</td></tr>
+  <tr><td style="color:#888">Cadre (offert)</td><td></td><td style="text-align:right;color:#27ae60">Gratuit</td></tr>
+  </tbody>
+  <tfoot><tr style="background:#E6F1FB;"><td colspan="2" style="font-weight:600;text-transform:uppercase;font-size:.7rem;letter-spacing:.1em">Acompte payé (50%)</td><td style="text-align:right" class="total">${acompte} $</td></tr>
+  <tr><td colspan="2" style="color:#888;font-size:.8rem;">Solde restant à la livraison</td><td style="text-align:right;color:#888">${o.amount - acompte} $</td></tr>
+  </tfoot></table>
+  <div style="margin-top:2rem;font-size:.75rem;color:#888;border-top:1px solid #eee;padding-top:1rem;">Merci de votre confiance — Élirïs'Art © ${new Date().getFullYear()}</div>
+  </body></html>`;
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'facture-' + o.order_num + '.html';
+  a.click();
+}
+
+// ══════════════════════════════════════════════════════
+// ADMIN — MESSAGERIE (réponse aux clients)
+// ══════════════════════════════════════════════════════
+async function renderAdminMessages() {
+  const el = document.getElementById('adminMessagesArea');
+  if (!el) return;
+  const { orders } = await _adminCall('get_orders');
+  if (!orders || orders.length === 0) { el.innerHTML = '<div style="color:rgba(255,255,255,0.2); padding:2rem; font-style:italic;">Aucune commande.</div>'; return; }
+  el.innerHTML = orders.map(o => {
+    const statusColor = o.payment_status === 'confirmed' ? '#4ade80' : o.payment_status === 'pending' ? '#facc15' : '#f87171';
+    return `<div onclick="openAdminConv('${o.id}', '${o.order_num}', '${o.name}', ${o.amount}, '${o.format}')"
+      style="background:#0A1628; border:1px solid rgba(255,255,255,0.08); padding:1rem 1.2rem; margin-bottom:0.6rem; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:border-color 0.2s;"
+      onmouseover="this.style.borderColor='rgba(201,168,76,0.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'">
+      <div>
+        <div style="font-size:0.68rem; color:var(--gold); letter-spacing:0.1em;">${o.order_num}</div>
+        <div style="font-size:0.88rem; color:var(--white); margin-top:0.2rem;">${o.name} — ${o.format} — ${o.amount}$</div>
+      </div>
+      <div style="font-size:0.65rem; color:${statusColor}; white-space:nowrap;">${o.payment_status === 'confirmed' ? '✅ Payé' : o.payment_status === 'pending' ? '⏳ À confirmer' : '💳 En attente'}</div>
+    </div>`;
+  }).join('');
+}
+
+let _adminConvId = null;
+async function openAdminConv(orderId, orderNum, clientName, amount, format) {
+  _adminConvId = orderId;
+  const panel = document.getElementById('adminConvPanel');
+  if (!panel) return;
+  panel.style.display = 'block';
+  document.getElementById('adminConvTitle').textContent = `${orderNum} — ${clientName}`;
+
+  // Check payment status
+  const { order } = await _adminCall('get_order', { id: orderId });
+  const confirmBtn = document.getElementById('adminConfirmPayBtn');
+  if (order && order.payment_status === 'pending') {
+    confirmBtn.style.display = 'block';
+    document.getElementById('adminPayRef').textContent = `Réf: ${order.payment_ref || '—'} via ${order.payment_method || '—'}`;
+  } else if (order && order.payment_status === 'confirmed') {
+    confirmBtn.style.display = 'none';
+    document.getElementById('adminPayRef').textContent = '✅ Acompte confirmé';
+  } else {
+    confirmBtn.style.display = 'none';
+    document.getElementById('adminPayRef').textContent = 'Aucun paiement soumis';
+  }
+
+  await loadAdminMessages(orderId);
+  _supa.channel('admin-msgs-' + orderId).on('postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'messages', filter: `order_id=eq.${orderId}` },
+    () => loadAdminMessages(orderId)
+  ).subscribe();
+}
+
+async function loadAdminMessages(orderId) {
+  const { data: msgs } = await _supa.from('messages').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
+  const box = document.getElementById('adminConvMessages');
+  if (!box) return;
+  if (!msgs || msgs.length === 0) { box.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:0.8rem; text-align:center; padding:2rem;">Aucun message.</div>'; return; }
+  box.innerHTML = msgs.map(m => {
+    const isAdmin = m.sender === 'admin';
+    return `<div style="display:flex; flex-direction:column; align-items:${isAdmin ? 'flex-end' : 'flex-start'};">
+      <div style="max-width:75%; background:${isAdmin ? 'var(--blue-mid)' : '#132238'}; padding:0.7rem 1rem; font-size:0.85rem; color:rgba(255,255,255,0.9); line-height:1.5;">
+        ${!isAdmin ? '<div style="font-size:0.6rem; color:var(--gold); letter-spacing:0.1em; margin-bottom:0.3rem; text-transform:uppercase;">Client</div>' : ''}
+        ${m.image ? `<img src="${m.image}" style="max-width:200px; max-height:160px; display:block; margin-bottom:${m.text ? '0.5rem' : '0'}; cursor:pointer;" onclick="downloadImg('${m.image}', 'photo-client-${m.id}')">` : ''}
+        ${m.text ? `<div>${m.text}</div>` : ''}
+      </div>
+      <div style="font-size:0.62rem; color:rgba(255,255,255,0.2); margin-top:0.2rem; padding:0 0.3rem;">${new Date(m.created_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })}</div>
+    </div>`;
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendAdminMessage() {
+  const input = document.getElementById('adminMsgInput');
+  const text = input.value.trim();
+  if (!text || !_adminConvId) return;
+  input.value = '';
+  await _adminCall('send_admin_message', { order_id: _adminConvId, text });
+}
+
+async function sendAdminImage(input) {
+  const file = input.files[0];
+  if (!file || !_adminConvId) return;
+  const compressed = await compressImage(file, 0.85, 1400);
+  await _adminCall('send_admin_message', { order_id: _adminConvId, image: compressed });
+  input.value = '';
+}
+
+async function confirmPayment() {
+  if (!_adminConvId) return;
+  if (!confirm('Confirmer le paiement de l\'acompte pour cette commande ?')) return;
+  await _adminCall('confirm_payment', { order_id: _adminConvId });
+  // Send auto-message
+  await _adminCall('send_admin_message', { order_id: _adminConvId, text: '✅ Votre acompte a été confirmé ! Votre commande est maintenant en cours. Vous pouvez télécharger votre facture depuis cette conversation.' });
+  document.getElementById('adminConfirmPayBtn').style.display = 'none';
+  document.getElementById('adminPayRef').textContent = '✅ Acompte confirmé';
+  showToast('✅ Paiement confirmé — client notifié');
+  renderAdminMessages();
+}
 </script>
 </body>
 </html>
