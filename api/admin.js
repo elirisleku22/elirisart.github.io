@@ -56,6 +56,10 @@ module.exports = async function handler(req, res) {
       });
       return res.json({ ok: true });
     }
+    if (action === 'delete_message') {
+      await sb('DELETE', `messages?id=eq.${data.id}`);
+      return res.json({ ok: true });
+    }
     if (action === 'confirm_payment') {
       await sb('PATCH', `orders?id=eq.${data.order_id}`, { payment_status: 'confirmed' });
       return res.json({ ok: true });
