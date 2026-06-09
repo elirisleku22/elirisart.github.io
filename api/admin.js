@@ -42,6 +42,24 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    if (action === 'get_order') {
+      const { data: order } = await sb('GET', `orders?id=eq.${data.id}`);
+      return res.json({ order: Array.isArray(order) ? order[0] : null });
+    }
+    if (action === 'send_admin_message') {
+      await sb('POST', 'messages', {
+        order_id: data.order_id,
+        sender: 'admin',
+        text: data.text || null,
+        image: data.image || null,
+        created_at: Date.now()
+      });
+      return res.json({ ok: true });
+    }
+    if (action === 'confirm_payment') {
+      await sb('PATCH', `orders?id=eq.${data.order_id}`, { payment_status: 'confirmed' });
+      return res.json({ ok: true });
+    }
     if (action === 'get_orders') {
       const { data } = await sb('GET', 'orders?order=created_at.desc');
       return res.json({ orders: data || [] });
