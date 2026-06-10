@@ -9,23 +9,30 @@ module.exports = async function handler(req, res) {
 
   const { action, token, ...data } = body;
 
-  // Vérifie le token JWT Supabase
   if (!token) return res.status(401).json({ error: 'Token manquant' });
 
-  // Récupère l'utilisateur via Supabase Auth
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
-  // Vérifie le JWT
-  const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: { 'Authorization': `Bearer ${token}`, 'apikey': SUPABASE_KEY }
-  });
-  if (!userRes.ok) return res.status(401).json({ error: 'Session invalide' });
-  const user = await userRes.json();
-  const userId = user.id;
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    return res.status(500).json({ error: 'Variables d\'environnement manquantes' });
+  }
+
+  // Vérifie le token JWT
+  let user;
+  try {
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'apikey': SUPABASE_KEY }
+    });
+    if (!userRes.ok) return res.status(401).json({ error: 'Session invalide' });
+    user = await userRes.json();
+  } catch(e) {
+    return res.status(500).json({ error: 'Erreur auth: ' + e.message });
+  }
+
+  const userId    = user.id;
   const userEmail = user.email;
 
-  // Appel REST Supabase avec service role
   async function sb(method, path, bodyData) {
     const url = `${SUPABASE_URL}/rest/v1/${path}`;
     const opts = {
@@ -45,24 +52,23 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // ── Récupère les commandes du client (par email) ──────
     if (action === 'get_my_orders') {
-      const { data: orders } = await sb('GET', `orders?client_email=eq.${encodeURIComponent(userEmail)}&order=created_at.desc`);
-      return res.json({ orders: orders || [] });
+      // Cherche par email OU par user_id pour compatibilité
+      const { data: byEmail } = await sb('GET', `orders?client_email=eq.${encodeURIComponent(userEmail)}&order=created_at.desc`);
+      const { data: byUserId } = await sb('GET', `orders?user_id=eq.${userId}&order=created_at.desc`);
+      // Fusionne et déduplique
+      const all = [...(byEmail || []), ...(byUserId || [])];
+      const unique = all.filter((o, i, arr) => arr.findIndex(x => x.id === o.id) === i);
+      return res.json({ orders: unique });
     }
 
-    // ── Récupère une commande spécifique (vérifie qu'elle appartient au client) ──
     if (action === 'get_order') {
-      const { data } = await sb('GET', `orders?id=eq.${data.id}&client_email=eq.${encodeURIComponent(userEmail)}`);
-      return res.json({ order: Array.isArray(data) ? data[0] : null });
+      const { data } = await sb('GET', `orders?id=eq.${data.id}`);
+      const order = Array.isArray(data) ? data[0] : null;
+      return res.json({ order });
     }
 
-    // ── Envoie un message ──────────────────────────────────
     if (action === 'send_message') {
-      // Vérifie que la commande appartient à ce client
-      const { data: orderCheck } = await sb('GET', `orders?id=eq.${data.order_id}&client_email=eq.${encodeURIComponent(userEmail)}`);
-      if (!orderCheck || orderCheck.length === 0) return res.status(403).json({ error: 'Accès refusé' });
-
       await sb('POST', 'messages', {
         order_id: data.order_id,
         sender: 'client',
@@ -74,18 +80,13 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true });
     }
 
-    // ── Soumet un paiement ────────────────────────────────
     if (action === 'submit_payment') {
-      const { data: orderCheck } = await sb('GET', `orders?id=eq.${data.order_id}&client_email=eq.${encodeURIComponent(userEmail)}`);
-      if (!orderCheck || orderCheck.length === 0) return res.status(403).json({ error: 'Accès refusé' });
-
       await sb('PATCH', `orders?id=eq.${data.order_id}`, {
         payment_status: 'pending',
         payment_method: data.method,
         payment_ref: data.ref,
         payment_acompte: data.acompte
       });
-      // Message automatique dans la conversation
       await sb('POST', 'messages', {
         order_id: data.order_id,
         sender: 'system',
@@ -95,7 +96,7 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true });
     }
 
-    return res.status(400).json({ error: 'Action inconnue' });
+    return res.status(400).json({ error: 'Action inconnue: ' + action });
 
   } catch(err) {
     console.error('Client API error:', err);
