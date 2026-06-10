@@ -3606,14 +3606,17 @@ function updateBubbleLabel() {
   }
 }
 // Cache la bulle sur les pages admin et auth
-const _origShowPage = showPage;
-function showPage(id) {
-  _origShowPage(id);
-  const bubble = document.getElementById('floatingMsgBubble');
-  if (bubble) bubble.style.display = (id === 'admin' || id === 'auth' || id === 'messages') ? 'none' : 'flex';
-}
 document.addEventListener('DOMContentLoaded', () => {
   updateBubbleLabel();
+  // Surveille les changements de page via MutationObserver
+  const observer = new MutationObserver(() => {
+    const bubble = document.getElementById('floatingMsgBubble');
+    if (!bubble) return;
+    const activePage = document.querySelector('.page.active');
+    const pageId = activePage ? activePage.id.replace('page-', '') : '';
+    bubble.style.display = (pageId === 'admin' || pageId === 'auth' || pageId === 'messages') ? 'none' : 'flex';
+  });
+  observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['class'] });
 });
 </script>
 
