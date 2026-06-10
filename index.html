@@ -1513,7 +1513,7 @@ document.addEventListener('DOMContentLoaded', _initSupabase);
           </div>
           <div style="background:var(--blue-deep); padding:2rem; margin-top:0;">
             <div style="font-size:0.7rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold); margin-bottom:0.8rem;">Commande rapide</div>
-            <p style="font-size:0.85rem; color:rgba(255,255,255,0.6); line-height:1.8; font-weight:300; margin-bottom:1.2rem;">Cliquez ci-dessous pour commander directement via WhatsApp ou parcourez nos formats disponibles.</p>
+            <p style="font-size:0.85rem; color:rgba(255,255,255,0.6); line-height:1.8; font-weight:300; margin-bottom:1.2rem;">Choisissez votre format ci-dessous — créez votre compte pour commander et suivre votre commande en temps réel.</p>
             <div style="display:flex; gap:0.8rem; flex-wrap:wrap;">
               <a href="https://wa.me/243995562489" target="_blank" class="btn-gold" style="font-size:0.7rem; padding:0.7rem 1.5rem;">WhatsApp Rapide</a>
               <a href="#" class="btn-outline" style="font-size:0.7rem; padding:0.7rem 1.5rem;" onclick="showPage('pricing')">Voir les Tarifs</a>
@@ -1572,8 +1572,8 @@ document.addEventListener('DOMContentLoaded', _initSupabase);
       <input type="hidden" id="orderPhotoData">
     </div>
 
-    <button class="submit-btn" onclick="submitOrder()">Confirmer & Envoyer sur WhatsApp</button>
-    <p class="whatsapp-note">📱 Vous serez redirigé vers WhatsApp pour finaliser votre commande avec Élie LEKU</p>
+    <button class="submit-btn" onclick="submitOrder()">Confirmer & Passer la Commande</button>
+    <p class="whatsapp-note">🔒 Votre commande sera enregistrée dans votre espace client</p>
   </div>
 </div>
 
@@ -3027,7 +3027,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <!-- Message input -->
-        <div id="convInputArea" style="border:1px solid rgba(255,255,255,0.1); background:#0A1628;">
+        <div id="convInputArea" style="border:1px solid rgba(255,255,255,0.1); background:#0A1628; display:block;">
           <div style="display:flex; align-items:flex-end; gap:0.5rem; padding:0.8rem;">
             <textarea id="convMsgInput" rows="2" placeholder="Écrivez votre message..." style="flex:1; background:transparent; border:none; color:rgba(255,255,255,0.8); font-family:'Josefin Sans',sans-serif; font-size:0.85rem; resize:none; outline:none; line-height:1.5;"></textarea>
             <div style="display:flex; flex-direction:column; gap:0.4rem;">
@@ -3338,6 +3338,8 @@ async function openConversation(orderId) {
 
   // Payment badge
   const badge = document.getElementById('convPaymentBadge');
+  const acompte = Math.ceil(order.amount * 0.5);
+
   if (order.payment_status === 'confirmed') {
     badge.innerHTML = '<span style="background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.3); color:#4ade80; font-size:0.65rem; padding:0.3rem 0.8rem; letter-spacing:0.1em; text-transform:uppercase;">✅ Acompte Confirmé</span>';
     document.getElementById('convPaymentSection').style.display = 'none';
@@ -3348,7 +3350,6 @@ async function openConversation(orderId) {
     document.getElementById('convInvoiceBtn').style.display = 'none';
   } else {
     badge.innerHTML = '<span style="background:rgba(248,113,113,0.1); border:1px solid rgba(248,113,113,0.3); color:#f87171; font-size:0.65rem; padding:0.3rem 0.8rem; letter-spacing:0.1em; text-transform:uppercase;">💳 Paiement requis</span>';
-    const acompte = Math.ceil(order.amount * 0.5);
     document.getElementById('convAcompteInfo').innerHTML = `
       Montant total : <strong style="color:var(--white)">${order.amount} $</strong><br>
       Acompte à payer (50%) : <strong style="color:var(--gold); font-size:1.1rem;">${acompte} $</strong><br>
@@ -3357,7 +3358,11 @@ async function openConversation(orderId) {
     document.getElementById('convInvoiceBtn').style.display = 'none';
   }
 
+  // Zone de saisie toujours visible
+  document.getElementById('convInputArea').style.display = 'block';
+
   await loadMessages(orderId);
+
   // Realtime messages
   _supa.channel('msgs-' + orderId).on('postgres_changes',
     { event: 'INSERT', schema: 'public', table: 'messages', filter: `order_id=eq.${orderId}` },
@@ -3374,21 +3379,48 @@ function closeConversation() {
 async function loadMessages(orderId) {
   const { data: msgs } = await _supa.from('messages').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
   const box = document.getElementById('convMessages');
+  const o   = window._currentOrder;
+  const acompte = o ? Math.ceil(o.amount * 0.5) : 0;
+
+  // Message de bienvenue fixe en haut (résumé de commande)
+  const welcomeHtml = o ? `
+    <div style="background:rgba(201,168,76,0.07); border:1px solid rgba(201,168,76,0.2); padding:1.2rem; border-radius:4px; margin-bottom:0.5rem;">
+      <div style="font-size:0.6rem; color:var(--gold); letter-spacing:0.15em; text-transform:uppercase; margin-bottom:0.7rem;">📋 Résumé de votre commande</div>
+      <div style="font-size:0.82rem; color:rgba(255,255,255,0.85); line-height:1.9;">
+        <b style="color:var(--white);">N° :</b> ${o.order_num}<br>
+        <b style="color:var(--white);">Format :</b> Portrait ${o.format} (${getDimensions(o.format)})<br>
+        <b style="color:var(--white);">Montant total :</b> ${o.amount} $<br>
+        <b style="color:var(--white);">Acompte (50%) :</b> <span style="color:var(--gold); font-weight:600;">${acompte} $</span><br>
+        <b style="color:var(--white);">Date :</b> ${o.date}<br>
+        ${o.description ? `<b style="color:var(--white);">Description :</b> ${o.description}` : ''}
+      </div>
+      ${o.payment_status === 'confirmed' ? `
+        <div style="margin-top:1rem; padding-top:0.8rem; border-top:1px solid rgba(201,168,76,0.2);">
+          <button onclick="downloadInvoice()" style="background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.3); color:#4ade80; font-family:'Josefin Sans',sans-serif; font-size:0.65rem; padding:0.5rem 1.2rem; cursor:pointer; letter-spacing:0.1em; text-transform:uppercase;">📄 Télécharger ma Facture</button>
+        </div>` : ''}
+    </div>` : '';
+
   if (!msgs || msgs.length === 0) {
-    box.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:0.8rem; text-align:center; padding:2rem; margin:auto;">Aucun message — commencez la conversation !</div>';
+    box.innerHTML = welcomeHtml + `
+      <div style="color:rgba(255,255,255,0.2); font-size:0.8rem; text-align:center; padding:1.5rem;">
+        Bienvenue ! Posez vos questions ici — l'artiste vous répondra rapidement.
+      </div>`;
     return;
   }
-  box.innerHTML = msgs.map(m => {
-    const isMe = m.sender === 'client';
+
+  box.innerHTML = welcomeHtml + msgs.map(m => {
+    const isMe    = m.sender === 'client';
     const isAdmin = m.sender === 'admin';
+    const isSystem = m.sender === 'system';
+    if (isSystem) return `<div style="text-align:center; font-size:0.72rem; color:var(--gold); background:rgba(201,168,76,0.07); padding:0.6rem 1rem; border-radius:4px;">${m.text}</div>`;
     return `
       <div style="display:flex; flex-direction:column; align-items:${isMe ? 'flex-end' : 'flex-start'};">
         <div style="max-width:75%; background:${isMe ? 'var(--blue-mid)' : '#132238'}; padding:0.7rem 1rem; font-size:0.85rem; color:rgba(255,255,255,0.9); line-height:1.5; border-radius:2px;">
           ${isAdmin ? '<div style="font-size:0.6rem; color:var(--gold); letter-spacing:0.1em; margin-bottom:0.3rem; text-transform:uppercase;">Élirïs\'Art</div>' : ''}
-          ${m.image ? `<img src="${m.image}" style="max-width:220px; max-height:180px; display:block; margin-bottom:${m.text ? '0.5rem' : '0'}; cursor:pointer; border-radius:2px;" onclick="downloadImg('${m.image}', 'photo-${m.id}')">` : ''}
+          ${m.image ? `<img src="${m.image}" style="max-width:220px; max-height:180px; display:block; margin-bottom:${m.text?'0.5rem':'0'}; cursor:pointer; border-radius:2px;" onclick="downloadImg('${m.image}','photo-${m.id}')">` : ''}
           ${m.text ? `<div>${m.text}</div>` : ''}
         </div>
-        <div style="font-size:0.62rem; color:rgba(255,255,255,0.2); margin-top:0.2rem; padding:0 0.3rem;">${new Date(m.created_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })}</div>
+        <div style="font-size:0.62rem; color:rgba(255,255,255,0.2); margin-top:0.2rem; padding:0 0.3rem;">${new Date(m.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</div>
       </div>`;
   }).join('');
   box.scrollTop = box.scrollHeight;
@@ -3430,7 +3462,7 @@ async function submitPayment() {
   if (!window._currentOrder) return;
   const session = (await _supa.auth.getSession()).data.session;
   const acompte = Math.ceil(window._currentOrder.amount * 0.5);
-  await fetch('/api/client', {
+  const res = await fetch('/api/client', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -3440,9 +3472,13 @@ async function submitPayment() {
       method, ref, acompte
     })
   });
+  const result = await res.json();
+  if (result.error) { showToast('❌ Erreur : ' + result.error); return; }
+  window._currentOrder.payment_status = 'pending';
   showToast('✅ Paiement soumis — en attente de confirmation par l\'artiste');
   document.getElementById('convPaymentSection').style.display = 'none';
   document.getElementById('convPaymentBadge').innerHTML = '<span style="background:rgba(250,204,21,0.1); border:1px solid rgba(250,204,21,0.3); color:#facc15; font-size:0.65rem; padding:0.3rem 0.8rem; letter-spacing:0.1em; text-transform:uppercase;">⏳ En attente de confirmation</span>';
+  await loadMessages(window._currentOrder.id);
 }
 
 function downloadImg(src, name) {
