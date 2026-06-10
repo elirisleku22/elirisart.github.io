@@ -2099,6 +2099,12 @@ function initAdminPage() {
 let currentFormat = '', currentMin = 0, currentMax = 0;
 
 function openOrderModal(format, min, max) {
+  // Si pas connecté, redirige vers création de compte
+  if (!window._currentUser) {
+    showToast('👤 Créez un compte pour commander');
+    setTimeout(() => { showPage('auth'); switchAuthTab('signup'); }, 400);
+    return;
+  }
   currentFormat = format; currentMin = min; currentMax = max;
   document.getElementById('modalTitle').textContent = 'Commander un Portrait ' + format;
   document.getElementById('modalSub').textContent = format + ' — ' + getDimensions(format);
@@ -3570,5 +3576,46 @@ async function confirmPayment() {
   renderAdminMessages();
 }
 </script>
+
+<!-- ══ BULLE FLOTTANTE MESSAGERIE ══ -->
+<div id="floatingMsgBubble" onclick="goToMessages()" title="Espace Client — Mes Commandes & Messages"
+  style="position:fixed; bottom:2rem; right:2rem; z-index:9999;
+         background:var(--gold); border-radius:50px;
+         padding:0.85rem 1.4rem; display:flex; align-items:center; gap:0.6rem;
+         cursor:pointer; box-shadow:0 4px 24px rgba(201,168,76,0.45);
+         font-family:'Josefin Sans',sans-serif; font-size:0.7rem; font-weight:600;
+         letter-spacing:0.12em; text-transform:uppercase; color:var(--blue-deep);
+         transition:transform 0.2s, box-shadow 0.2s; user-select:none;"
+  onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 32px rgba(201,168,76,0.6)'"
+  onmouseout="this.style.transform='';this.style.boxShadow='0 4px 24px rgba(201,168,76,0.45)'">
+  <span style="font-size:1.1rem;">💬</span>
+  <span id="bubbleLabel">Espace Client</span>
+  <span id="bubbleNotif" style="display:none; background:var(--blue-deep); color:var(--gold); border-radius:50%; width:18px; height:18px; font-size:0.6rem; display:inline-flex; align-items:center; justify-content:center; font-weight:700;"></span>
+</div>
+
+<script>
+// Met à jour le label de la bulle selon l'état de connexion
+function updateBubbleLabel() {
+  const bubble = document.getElementById('bubbleLabel');
+  if (!bubble) return;
+  if (window._currentUser) {
+    const name = window._currentUser.user_metadata?.full_name?.split(' ')[0] || 'Mon Espace';
+    bubble.textContent = name;
+  } else {
+    bubble.textContent = 'Espace Client';
+  }
+}
+// Cache la bulle sur les pages admin et auth
+const _origShowPage = showPage;
+function showPage(id) {
+  _origShowPage(id);
+  const bubble = document.getElementById('floatingMsgBubble');
+  if (bubble) bubble.style.display = (id === 'admin' || id === 'auth' || id === 'messages') ? 'none' : 'flex';
+}
+document.addEventListener('DOMContentLoaded', () => {
+  updateBubbleLabel();
+});
+</script>
+
 </body>
 </html>
