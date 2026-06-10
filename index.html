@@ -2219,6 +2219,7 @@ async function loadOrderPhotos() {
 async function saveLog(data) {
   const session = (await _supa.auth.getSession()).data.session;
   const clientEmail = session?.user?.email || null;
+  const userId      = session?.user?.id     || null;
   await _supa.from('orders').insert({
     order_num: data.orderNum,
     date: new Date().toLocaleString('fr-FR'),
@@ -2230,6 +2231,7 @@ async function saveLog(data) {
     status: 'new',
     payment_status: 'unpaid',
     client_email: clientEmail,
+    user_id: userId,
     created_at: Date.now()
   });
 }
@@ -3543,102 +3545,20 @@ function downloadInvoice() {
   a.click();
 }
 
-// ══════════════════════════════════════════════════════
-// ADMIN — MESSAGERIE (réponse aux clients)
-// ══════════════════════════════════════════════════════
-async function renderAdminMessages() {
-  const el = document.getElementById('adminMessagesArea');
-  if (!el) return;
-  const { orders } = await _adminCall('get_orders');
-  if (!orders || orders.length === 0) { el.innerHTML = '<div style="color:rgba(255,255,255,0.2); padding:2rem; font-style:italic;">Aucune commande.</div>'; return; }
-  el.innerHTML = orders.map(o => {
-    const statusColor = o.payment_status === 'confirmed' ? '#4ade80' : o.payment_status === 'pending' ? '#facc15' : '#f87171';
-    return `<div onclick="openAdminConv('${o.id}', '${o.order_num}', '${o.name}', ${o.amount}, '${o.format}')"
-      style="background:#0A1628; border:1px solid rgba(255,255,255,0.08); padding:1rem 1.2rem; margin-bottom:0.6rem; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:border-color 0.2s;"
-      onmouseover="this.style.borderColor='rgba(201,168,76,0.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'">
-      <div>
-        <div style="font-size:0.68rem; color:var(--gold); letter-spacing:0.1em;">${o.order_num}</div>
-        <div style="font-size:0.88rem; color:var(--white); margin-top:0.2rem;">${o.name} — ${o.format} — ${o.amount}$</div>
-      </div>
-      <div style="font-size:0.65rem; color:${statusColor}; white-space:nowrap;">${o.payment_status === 'confirmed' ? '✅ Payé' : o.payment_status === 'pending' ? '⏳ À confirmer' : '💳 En attente'}</div>
-    </div>`;
-  }).join('');
-}
-
-let _adminConvId = null;
-async function openAdminConv(orderId, orderNum, clientName, amount, format) {
-  _adminConvId = orderId;
-  const panel = document.getElementById('adminConvPanel');
-  if (!panel) return;
-  panel.style.display = 'block';
-  document.getElementById('adminConvTitle').textContent = `${orderNum} — ${clientName}`;
-
-  // Check payment status
-  const { order } = await _adminCall('get_order', { id: orderId });
-  const confirmBtn = document.getElementById('adminConfirmPayBtn');
-  if (order && order.payment_status === 'pending') {
-    confirmBtn.style.display = 'block';
-    document.getElementById('adminPayRef').textContent = `Réf: ${order.payment_ref || '—'} via ${order.payment_method || '—'}`;
-  } else if (order && order.payment_status === 'confirmed') {
-    confirmBtn.style.display = 'none';
-    document.getElementById('adminPayRef').textContent = '✅ Acompte confirmé';
-  } else {
-    confirmBtn.style.display = 'none';
-    document.getElementById('adminPayRef').textContent = 'Aucun paiement soumis';
-  }
-
-  await loadAdminMessages(orderId);
-  _supa.channel('admin-msgs-' + orderId).on('postgres_changes',
-    { event: 'INSERT', schema: 'public', table: 'messages', filter: `order_id=eq.${orderId}` },
-    () => loadAdminMessages(orderId)
-  ).subscribe();
-}
-
-async function loadAdminMessages(orderId) {
-  const { data: msgs } = await _supa.from('messages').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
-  const box = document.getElementById('adminConvMessages');
-  if (!box) return;
-  if (!msgs || msgs.length === 0) { box.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:0.8rem; text-align:center; padding:2rem;">Aucun message.</div>'; return; }
-  box.innerHTML = msgs.map(m => {
-    const isAdmin = m.sender === 'admin';
-    return `<div style="display:flex; flex-direction:column; align-items:${isAdmin ? 'flex-end' : 'flex-start'};">
-      <div style="max-width:75%; background:${isAdmin ? 'var(--blue-mid)' : '#132238'}; padding:0.7rem 1rem; font-size:0.85rem; color:rgba(255,255,255,0.9); line-height:1.5;">
-        ${!isAdmin ? '<div style="font-size:0.6rem; color:var(--gold); letter-spacing:0.1em; margin-bottom:0.3rem; text-transform:uppercase;">Client</div>' : ''}
-        ${m.image ? `<img src="${m.image}" style="max-width:200px; max-height:160px; display:block; margin-bottom:${m.text ? '0.5rem' : '0'}; cursor:pointer;" onclick="downloadImg('${m.image}', 'photo-client-${m.id}')">` : ''}
-        ${m.text ? `<div>${m.text}</div>` : ''}
-      </div>
-      <div style="font-size:0.62rem; color:rgba(255,255,255,0.2); margin-top:0.2rem; padding:0 0.3rem;">${new Date(m.created_at).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' })}</div>
-    </div>`;
-  }).join('');
-  box.scrollTop = box.scrollHeight;
-}
-
 async function sendAdminMessage() {
   const input = document.getElementById('adminMsgInput');
   const text = input.value.trim();
-  if (!text || !_adminConvId) return;
+  if (!text || !_adminActiveOrderId) return;
   input.value = '';
-  await _adminCall('send_admin_message', { order_id: _adminConvId, text });
+  await _adminCall('send_admin_message', { order_id: _adminActiveOrderId, text });
 }
 
-async function sendAdminImage(input) {
-  const file = input.files[0];
-  if (!file || !_adminConvId) return;
-  const compressed = await compressImage(file, 0.85, 1400);
-  await _adminCall('send_admin_message', { order_id: _adminConvId, image: compressed });
-  input.value = '';
-}
-
-async function confirmPayment() {
-  if (!_adminConvId) return;
-  if (!confirm('Confirmer le paiement de l\'acompte pour cette commande ?')) return;
-  await _adminCall('confirm_payment', { order_id: _adminConvId });
-  // Send auto-message
-  await _adminCall('send_admin_message', { order_id: _adminConvId, text: '✅ Votre acompte a été confirmé ! Votre commande est maintenant en cours. Vous pouvez télécharger votre facture depuis cette conversation.' });
-  document.getElementById('adminConfirmPayBtn').style.display = 'none';
-  document.getElementById('adminPayRef').textContent = '✅ Acompte confirmé';
-  showToast('✅ Paiement confirmé — client notifié');
-  renderAdminMessages();
+async function sendAdminImage(fileInput) {
+  const file = fileInput.files[0];
+  if (!file || !_adminActiveOrderId) return;
+  const compressed = await compressImage(file, 0.80, 1200);
+  await _adminCall('send_admin_message', { order_id: _adminActiveOrderId, image: compressed });
+  fileInput.value = '';
 }
 </script>
 
