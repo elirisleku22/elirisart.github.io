@@ -2143,7 +2143,9 @@ function getDimensions(fmt) {
 
 function generateOrderNumber() {
   const now = new Date();
-  return 'EA-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + String(getLogs().length + 1).padStart(3,'0');
+  // Utilise un suffixe aléatoire pour éviter les doublons (le client ne connaît pas le total en BDD)
+  const rand = String(Math.floor(Math.random() * 900) + 100);
+  return 'EA-' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '-' + rand;
 }
 
 async function submitOrder() {
@@ -2322,7 +2324,7 @@ function exportLogs() {
   const logs = getLogs();
   if (!logs.length) { alert('Aucune commande à exporter.'); return; }
   const headers = ['N° Commande','Date','Client','Téléphone','Format','Montant ($)','Description','Statut'];
-  const rows = logs.map(l => [l.orderNum||'',l.date,l.name,l.phone,l.format,l.amount,l.desc||'',l.status]);
+  const rows = logs.map(l => [l.order_num||'',l.date,l.name,l.phone,l.format,l.amount,l.description||'',l.status]);
   const csv = [headers, ...rows].map(r => r.map(v => '"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
@@ -3005,7 +3007,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <!-- Payment section -->
         <div id="convPaymentSection" style="background:#0A1628; border:1px solid rgba(201,168,76,0.25); padding:1.5rem; margin-bottom:1.5rem; display:none;">
-          <div style="font-size:0.65rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:1rem;">💳 Paiement de l'Acompte (50%)</div>
+          <div style="font-size:0.65rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:1rem;">💳 Paiement Initial (10%)</div>
           <div id="convAcompteInfo" style="font-size:0.9rem; color:rgba(255,255,255,0.8); margin-bottom:1.2rem; line-height:1.8;"></div>
 
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.2rem;">
@@ -3048,7 +3050,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <!-- Message input -->
         <div id="convInputArea" style="border:1px solid rgba(255,255,255,0.1); background:#0A1628; display:block;">
           <div style="display:flex; align-items:flex-end; gap:0.5rem; padding:0.8rem;">
-            <textarea id="convMsgInput" rows="2" placeholder="Écrivez votre message..." style="flex:1; background:transparent; border:none; color:rgba(255,255,255,0.8); font-family:'Josefin Sans',sans-serif; font-size:0.85rem; resize:none; outline:none; line-height:1.5;"></textarea>
+            <textarea id="convMsgInput" rows="2" placeholder="Écrivez votre message... (Entrée pour envoyer)" style="flex:1; background:transparent; border:none; color:rgba(255,255,255,0.8); font-family:'Josefin Sans',sans-serif; font-size:0.85rem; resize:none; outline:none; line-height:1.5;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
             <div style="display:flex; flex-direction:column; gap:0.4rem;">
               <button onclick="document.getElementById('convImgInput').click()" title="Envoyer une image" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:rgba(255,255,255,0.5); width:36px; height:36px; cursor:pointer; font-size:1rem;">📷</button>
               <button onclick="sendMessage()" style="background:var(--gold); border:none; color:var(--blue-deep); width:36px; height:36px; cursor:pointer; font-size:1rem; font-weight:700;">→</button>
@@ -3178,15 +3180,16 @@ async function sendInvoiceToConv() {
   if (!_adminActiveOrderId) return;
   const order = (window._orders || []).find(o => o.id === _adminActiveOrderId);
   if (!order) { showToast('❌ Commande introuvable'); return; }
-  const acompte = Math.ceil(order.amount * 0.5);
+  const acompte = Math.ceil(order.amount * 0.1);
   const invoiceText = `📄 *FACTURE — Élirïs'Art*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `N° : ${order.order_num}\n` +
     `Client : ${order.name}\n` +
     `Format : Portrait ${order.format}\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
     `Montant total : ${order.amount} $\n` +
-    `Acompte payé : ${acompte} $\n` +
-    `Reste à payer : ${order.amount - acompte} $\n` +
+    `Acompte initial (10%) : ${acompte} $\n` +
+    `Solde à la livraison (90%) : ${order.amount - acompte} $\n` +
     `Date : ${order.date}\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `Merci de votre confiance — Élirïs'Art`;
@@ -3198,18 +3201,23 @@ async function confirmAdminPayment(orderId) {
   if (!confirm('Confirmer le paiement de l\'acompte pour cette commande ?')) return;
   await _adminCall('confirm_payment', { order_id: orderId });
   const order = (window._orders || []).find(o => o.id === orderId);
-  const acompte = order ? Math.ceil(order.amount * 0.5) : '?';
+  const acompte = order ? Math.ceil(order.amount * 0.1) : '?';
   // Message de confirmation + facture dans la conversation
   await _adminCall('send_admin_message', {
     order_id: orderId,
-    text: `✅ Votre acompte de ${acompte} $ a été confirmé ! Votre commande est maintenant en cours.\n\n` +
-          `📄 *Facture — Élirïs'Art*\n` +
+    text: `✅ Votre acompte initial de ${acompte} $ (10%) a été confirmé ! Votre commande est maintenant en cours de réalisation.\n\n` +
+          `📄 *FACTURE — Élirïs'Art*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
           `N° : ${order?.order_num || ''}\n` +
+          `Client : ${order?.name || ''}\n` +
           `Format : Portrait ${order?.format || ''}\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
           `Montant total : ${order?.amount || ''} $\n` +
-          `Acompte reçu : ${acompte} $\n` +
-          `Reste à payer à la livraison : ${order ? order.amount - acompte : '?'} $\n\n` +
-          `Délai de réalisation : 7 à 21 jours selon le format. Je vous tiendrai informé de l'avancement. Merci de votre confiance — Élirïs'Art 🎨`
+          `Acompte initial reçu (10%) : ${acompte} $\n` +
+          `Solde restant à la livraison (90%) : ${order ? order.amount - acompte : '?'} $\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `Paiement via : Airtel Money / M-Pesa\n\n` +
+          `⏱ Délai de réalisation : 7 à 21 jours selon le format.\nJe vous tiendrai informé de l'avancement à chaque étape. Merci de votre confiance — Élirïs'Art 🎨`
   });
   showToast('✅ Paiement confirmé + facture envoyée !');
   await loadAdminConversations();
@@ -3407,7 +3415,7 @@ async function openConversation(orderId) {
 
   // Payment badge
   const badge = document.getElementById('convPaymentBadge');
-  const acompte = Math.ceil(order.amount * 0.5);
+  const acompte = Math.ceil(order.amount * 0.1);
 
   if (order.payment_status === 'confirmed') {
     badge.innerHTML = '<span style="background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.3); color:#4ade80; font-size:0.65rem; padding:0.3rem 0.8rem; letter-spacing:0.1em; text-transform:uppercase;">✅ Acompte Confirmé</span>';
@@ -3420,9 +3428,22 @@ async function openConversation(orderId) {
   } else {
     badge.innerHTML = '<span style="background:rgba(248,113,113,0.1); border:1px solid rgba(248,113,113,0.3); color:#f87171; font-size:0.65rem; padding:0.3rem 0.8rem; letter-spacing:0.1em; text-transform:uppercase;">💳 Paiement requis</span>';
     document.getElementById('convAcompteInfo').innerHTML = `
-      Montant total : <strong style="color:var(--white)">${order.amount} $</strong><br>
-      Acompte à payer (50%) : <strong style="color:var(--gold); font-size:1.1rem;">${acompte} $</strong><br>
-      <span style="font-size:0.8rem; color:rgba(255,255,255,0.4);">Envoyez l'acompte via Airtel Money ou M-Pesa puis entrez la référence ci-dessous.</span>`;
+      <div style="margin-bottom:0.8rem;">
+        Montant total de la commande : <strong style="color:var(--white)">${order.amount} $</strong><br>
+        <span style="font-size:0.78rem; color:rgba(255,255,255,0.5);">Solde restant (90%) payable à la livraison : <strong style="color:rgba(255,255,255,0.6)">${order.amount - acompte} $</strong></span>
+      </div>
+      <div style="background:rgba(201,168,76,0.1); border:1px solid rgba(201,168,76,0.3); padding:0.8rem 1rem; margin-bottom:0.8rem;">
+        <div style="font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold); margin-bottom:0.4rem;">Acompte initial à payer maintenant (10%)</div>
+        <div style="font-size:1.4rem; font-weight:700; color:var(--gold);">${acompte} $</div>
+      </div>
+      <div style="font-size:0.78rem; color:rgba(255,255,255,0.55); line-height:1.8;">
+        <strong style="color:rgba(255,255,255,0.8);">Comment procéder :</strong><br>
+        1️⃣ Envoyez <strong style="color:var(--gold)">${acompte} $</strong> via <strong style="color:#ff6b6b;">Airtel Money</strong> au <strong style="color:var(--white)">+243 995 562 489</strong> (Élie LEKU)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;— ou via <strong style="color:#4CAF50;">M-Pesa</strong> au <strong style="color:var(--white)">+243 820 603 485</strong> (Élie LEKU)<br>
+        2️⃣ Notez la <strong style="color:rgba(255,255,255,0.8);">référence / code de transaction</strong><br>
+        3️⃣ Sélectionnez la méthode utilisée et entrez la référence ci-dessous<br>
+        4️⃣ L'artiste confirme votre paiement — la facture vous est envoyée automatiquement ✅
+      </div>`;
     document.getElementById('convPaymentSection').style.display = 'block';
     document.getElementById('convInvoiceBtn').style.display = 'none';
   }
@@ -3448,7 +3469,7 @@ function closeConversation() {
 async function loadMessages(orderId) {
   const box = document.getElementById('convMessages');
   const o   = window._currentOrder;
-  const acompte = o ? Math.ceil(o.amount * 0.5) : 0;
+  const acompte = o ? Math.ceil(o.amount * 0.1) : 0;
 
   // Résumé commande fixe en haut
   const welcomeHtml = o ? `
@@ -3458,7 +3479,7 @@ async function loadMessages(orderId) {
         <b style="color:var(--white);">N° :</b> ${o.order_num}<br>
         <b style="color:var(--white);">Format :</b> Portrait ${o.format} (${getDimensions(o.format)})<br>
         <b style="color:var(--white);">Montant total :</b> ${o.amount} $<br>
-        <b style="color:var(--white);">Acompte (50%) :</b> <span style="color:var(--gold); font-weight:600;">${acompte} $</span><br>
+        <b style="color:var(--white);">Acompte initial (10%) :</b> <span style="color:var(--gold); font-weight:600;">${acompte} $</span><br>
         <b style="color:var(--white);">Date :</b> ${o.date}
         ${o.description ? `<br><b style="color:var(--white);">Description :</b> ${o.description}` : ''}
       </div>
@@ -3522,7 +3543,8 @@ async function sendImageMessage(input) {
   const file = input.files[0];
   if (!file || !window._currentOrder) return;
   const compressed = await compressImage(file, 0.85, 1400);
-  const session = (await _supa.auth.getSession()).data.session;
+  const token = await _getToken();
+  if (!token) { showPage('auth'); return; }
   document.getElementById('convImgPreviewBar').style.display = 'block';
   document.getElementById('convImgPreviewBar').textContent = '⏳ Envoi de l\'image...';
   await fetch('/api/client', {
@@ -3541,7 +3563,7 @@ async function submitPayment() {
   if (!window._currentOrder) return;
   const token = await _getToken();
   if (!token) { showPage('auth'); return; }
-  const acompte = Math.ceil(window._currentOrder.amount * 0.5);
+  const acompte = Math.ceil(window._currentOrder.amount * 0.1);
   const res = await fetch('/api/client', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -3569,7 +3591,7 @@ function downloadImg(src, name) {
 function downloadInvoice() {
   const o = window._currentOrder;
   if (!o) return;
-  const acompte = Math.ceil(o.amount * 0.5);
+  const acompte = Math.ceil(o.amount * 0.1);
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Facture ${o.order_num}</title>
   <style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;color:#042C53;}h1{font-size:2rem;font-weight:300;}.gold{color:#C9A84C;}.muted{color:#888;font-size:0.8rem;}table{width:100%;border-collapse:collapse;margin-top:1.5rem;}td,th{padding:0.8rem 1rem;border-bottom:1px solid #eee;text-align:left;}th{font-size:0.7rem;text-transform:uppercase;letter-spacing:.1em;color:#888;}.total{font-size:1.4rem;color:#042C53;font-weight:600;}.badge{display:inline-block;background:#E6F1FB;color:#185FA5;padding:0.3rem 1rem;font-size:0.7rem;letter-spacing:.1em;text-transform:uppercase;}</style>
   </head><body>
@@ -3582,8 +3604,8 @@ function downloadInvoice() {
   <tr><td>Portrait Réaliste au Stylo à Bille</td><td>Portrait ${o.format}</td><td style="text-align:right">${o.amount} $</td></tr>
   <tr><td style="color:#888">Cadre (offert)</td><td></td><td style="text-align:right;color:#27ae60">Gratuit</td></tr>
   </tbody>
-  <tfoot><tr style="background:#E6F1FB;"><td colspan="2" style="font-weight:600;text-transform:uppercase;font-size:.7rem;letter-spacing:.1em">Acompte payé (50%)</td><td style="text-align:right" class="total">${acompte} $</td></tr>
-  <tr><td colspan="2" style="color:#888;font-size:.8rem;">Solde restant à la livraison</td><td style="text-align:right;color:#888">${o.amount - acompte} $</td></tr>
+  <tfoot><tr style="background:#E6F1FB;"><td colspan="2" style="font-weight:600;text-transform:uppercase;font-size:.7rem;letter-spacing:.1em">Acompte initial payé (10%)</td><td style="text-align:right" class="total">${acompte} $</td></tr>
+  <tr><td colspan="2" style="color:#888;font-size:.8rem;">Solde restant à la livraison (90%)</td><td style="text-align:right;color:#888">${o.amount - acompte} $</td></tr>
   </tfoot></table>
   <div style="margin-top:2rem;font-size:.75rem;color:#888;border-top:1px solid #eee;padding-top:1rem;">Merci de votre confiance — Élirïs'Art © ${new Date().getFullYear()}</div>
   </body></html>`;
@@ -3594,21 +3616,8 @@ function downloadInvoice() {
   a.click();
 }
 
-async function sendAdminMessage() {
-  const input = document.getElementById('adminMsgInput');
-  const text = input.value.trim();
-  if (!text || !_adminActiveOrderId) return;
-  input.value = '';
-  await _adminCall('send_admin_message', { order_id: _adminActiveOrderId, text });
-}
+// sendAdminMessage et sendAdminImage sont définis plus haut dans le bloc MESSAGERIE ADMIN
 
-async function sendAdminImage(fileInput) {
-  const file = fileInput.files[0];
-  if (!file || !_adminActiveOrderId) return;
-  const compressed = await compressImage(file, 0.80, 1200);
-  await _adminCall('send_admin_message', { order_id: _adminActiveOrderId, image: compressed });
-  fileInput.value = '';
-}
 </script>
 
 <!-- ══ BULLE FLOTTANTE MESSAGERIE ══ -->
@@ -3624,7 +3633,7 @@ async function sendAdminImage(fileInput) {
   onmouseout="this.style.transform='';this.style.boxShadow='0 4px 24px rgba(201,168,76,0.45)'">
   <span style="font-size:1.1rem;">💬</span>
   <span id="bubbleLabel">Espace Client</span>
-  <span id="bubbleNotif" style="display:none; background:var(--blue-deep); color:var(--gold); border-radius:50%; width:18px; height:18px; font-size:0.6rem; display:inline-flex; align-items:center; justify-content:center; font-weight:700;"></span>
+  <span id="bubbleNotif" style="display:none; background:var(--blue-deep); color:var(--gold); border-radius:50%; width:18px; height:18px; font-size:0.6rem; align-items:center; justify-content:center; font-weight:700;"></span>
 </div>
 
 <script>
