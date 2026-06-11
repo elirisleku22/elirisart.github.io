@@ -1,4 +1,10 @@
 module.exports = async function handler(req, res) {
+  // ── CORS — autorise GitHub Pages à appeler cette API ──
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }
@@ -9,7 +15,6 @@ module.exports = async function handler(req, res) {
   }
   if (!body) return res.status(400).json({ error: 'Corps manquant' });
 
-  // ⚠️ CORRECTION : renommé ...reqData pour éviter le shadowing de `data` plus bas
   const { action, password, ...reqData } = body;
 
   const isPhotoUpload = action === 'save_order_photo' && password && password.startsWith('CLIENT_PHOTO_');
@@ -42,15 +47,12 @@ module.exports = async function handler(req, res) {
 
   try {
 
-    // ─── COMMANDES ───────────────────────────────────────
     if (action === 'get_orders') {
-      // ⚠️ CORRECTION : renommé result pour éviter le shadowing de reqData
       const result = await sb('GET', 'orders?order=created_at.desc');
       return res.json({ orders: result.data || [] });
     }
 
     if (action === 'get_order') {
-      // ⚠️ CORRECTION : renommé result pour éviter le shadowing
       const result = await sb('GET', `orders?id=eq.${reqData.id}`);
       return res.json({ order: Array.isArray(result.data) ? result.data[0] : null });
     }
@@ -70,8 +72,6 @@ module.exports = async function handler(req, res) {
       return res.json({ error: null });
     }
 
-    // ─── MESSAGES ────────────────────────────────────────
-    // ⚠️ AJOUT : action get_messages manquante → causait "Action inconnue" dans admin
     if (action === 'get_messages') {
       const result = await sb('GET', `messages?order_id=eq.${reqData.order_id}&order=created_at.asc`);
       return res.json({ messages: Array.isArray(result.data) ? result.data : [] });
@@ -93,7 +93,6 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true });
     }
 
-    // ─── GALERIE ─────────────────────────────────────────
     if (action === 'insert_gallery') {
       await sb('POST', 'gallery', reqData);
       return res.json({ error: null });
@@ -104,7 +103,6 @@ module.exports = async function handler(req, res) {
       return res.json({ error: null });
     }
 
-    // ─── BLOG ─────────────────────────────────────────────
     if (action === 'insert_blog') {
       await sb('POST', 'blog', reqData);
       return res.json({ error: null });
@@ -121,7 +119,6 @@ module.exports = async function handler(req, res) {
       return res.json({ error: null });
     }
 
-    // ─── BANNIÈRE ─────────────────────────────────────────
     if (action === 'upsert_banner') {
       const upd = await sb('PATCH', 'banner?id=eq.main', { text: reqData.text, active: reqData.active });
       if (upd.status === 404 || (Array.isArray(upd.data) && upd.data.length === 0)) {
@@ -130,13 +127,11 @@ module.exports = async function handler(req, res) {
       return res.json({ error: null });
     }
 
-    // ─── TÉMOIGNAGES ──────────────────────────────────────
     if (action === 'delete_testimonial') {
       await sb('DELETE', `testimonials?id=eq.${reqData.id}`);
       return res.json({ error: null });
     }
 
-    // ─── PHOTOS COMMANDES ─────────────────────────────────
     if (action === 'save_order_photo') {
       await sb('POST', 'order_photos', {
         order_num: reqData.order_num,
