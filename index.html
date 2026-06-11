@@ -190,7 +190,7 @@ window._bannerData   = null;
 
 // ─── Appel API admin sécurisé ────────────────────────
 async function _adminCall(action, data = {}) {
-  const res = await fetch('/api/admin', {
+  const res = await fetch('https://elirisart-github-io.vercel.app/api/admin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, password: window._adminPwd, ...data })
@@ -2177,7 +2177,7 @@ async function submitOrder() {
 
   if (photo) {
     try {
-      await fetch('/api/admin', {
+      await fetch('https://elirisart-github-io.vercel.app/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save_order_photo', password: 'CLIENT_PHOTO_' + orderNum, order_num: orderNum, client_name: name, photo })
@@ -3341,7 +3341,7 @@ async function loadClientOrders() {
   const listEl = document.getElementById('clientOrdersList');
   listEl.innerHTML = '<div style="color:rgba(255,255,255,0.3); text-align:center; padding:2rem;">Chargement...</div>';
   try {
-    const res = await fetch('/api/client', {
+    const res = await fetch('https://elirisart-github-io.vercel.app/api/client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'get_my_orders', token: (await _supa.auth.getSession()).data.session?.access_token })
@@ -3392,7 +3392,7 @@ async function openConversation(orderId) {
   const token = await _getToken();
   if (!token) { showPage('auth'); return; }
 
-  const res = await fetch('/api/client', {
+  const res = await fetch('https://elirisart-github-io.vercel.app/api/client', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'get_order', token, id: orderId })
@@ -3492,7 +3492,7 @@ async function loadMessages(orderId) {
   // Charge les messages via API client
   try {
     const session = (await _supa.auth.getSession()).data.session;
-    const res = await fetch('/api/client', {
+    const res = await fetch('https://elirisart-github-io.vercel.app/api/client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'get_messages', order_id: orderId, token: session?.access_token })
@@ -3532,7 +3532,7 @@ async function sendMessage() {
   input.value = '';
   const token = await _getToken();
   if (!token) { showPage('auth'); return; }
-  await fetch('/api/client', {
+  await fetch('https://elirisart-github-io.vercel.app/api/client', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'send_message', token, order_id: window._currentOrder.id, text, sender: 'client' })
@@ -3547,7 +3547,7 @@ async function sendImageMessage(input) {
   if (!token) { showPage('auth'); return; }
   document.getElementById('convImgPreviewBar').style.display = 'block';
   document.getElementById('convImgPreviewBar').textContent = '⏳ Envoi de l\'image...';
-  await fetch('/api/client', {
+  await fetch('https://elirisart-github-io.vercel.app/api/client', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'send_message', token, order_id: window._currentOrder.id, image: compressed, sender: 'client' })
@@ -3564,7 +3564,7 @@ async function submitPayment() {
   const token = await _getToken();
   if (!token) { showPage('auth'); return; }
   const acompte = Math.ceil(window._currentOrder.amount * 0.1);
-  const res = await fetch('/api/client', {
+  const res = await fetch('https://elirisart-github-io.vercel.app/api/client', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
