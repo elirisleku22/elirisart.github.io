@@ -181,7 +181,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_wLOfKy-MX7dqaUT9HofIBw_qGm8boeu';
 const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 window._isAdmin      = false;
-window._adminPwd     = '';
+window._adminPwd = sessionStorage.getItem('_apwd') || '';
 window._galleryItems = [];
 window._blogPosts    = [];
 window._extraTestis  = [];
@@ -268,7 +268,20 @@ async function _initSupabase() {
   console.log('✅ Supabase connecté — Élirïs\'Art');
 }
 
-document.addEventListener('DOMContentLoaded', _initSupabase);
+document.addEventListener('DOMContentLoaded', () => {
+  _initSupabase();
+  // Auto-reconnexion admin si mot de passe en session
+  if (window._adminPwd) {
+    _adminCall('get_orders').then(({ orders }) => {
+      if (!orders) return;
+      window._isAdmin = true;
+      window._orders  = orders || [];
+    }).catch(() => {
+      window._adminPwd = '';
+      sessionStorage.removeItem('_apwd');
+    });
+  }
+});
 </script>
 
 <style>
@@ -2059,6 +2072,7 @@ function mobileNav(pageId) {
 function checkAdmin() {
   const pwd = document.getElementById('adminPwd').value;
   window._adminPwd = pwd;
+  sessionStorage.setItem('_apwd', pwd);
   _adminCall('get_orders').then(({ orders }) => {
     window._isAdmin = true;
     window._orders  = orders || [];
@@ -2080,6 +2094,7 @@ function checkAdmin() {
 function adminLogout() {
   window._isAdmin  = false;
   window._adminPwd = '';
+  sessionStorage.removeItem('_apwd');
   window._orders   = [];
   document.getElementById('adminDashboard').style.display = 'none';
   document.getElementById('adminLogin').style.display = 'flex';
@@ -3111,7 +3126,9 @@ async function openAdminConv(orderId, orderNum, clientName, amount, payStatus) {
 
 async function loadAdminMessages(orderId) {
   const msgsEl = document.getElementById('adminMsgsList');
-  const { data: msgs } = await _supa.from('messages').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
+  if (!msgsEl) return;
+  msgsEl.innerHTML = '<div style="color:rgba(255,255,255,0.3); font-size:0.8rem; text-align:center; padding:1rem;">Chargement...</div>';
+  const { messages: msgs } = await _adminCall('get_messages', { order_id: orderId });
   if (!msgs || msgs.length === 0) {
     msgsEl.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:0.8rem; text-align:center; padding:2rem;">Aucun message — commencez la conversation</div>';
     return;
@@ -3119,15 +3136,17 @@ async function loadAdminMessages(orderId) {
   msgsEl.innerHTML = msgs.map(m => {
     const isAdmin  = m.sender === 'admin';
     const isSystem = m.sender === 'system';
-    if (isSystem) return `<div style="text-align:center; font-size:0.7rem; color:var(--gold); background:rgba(201,168,76,0.08); padding:0.6rem 1rem; border-radius:4px;">${m.text}</div>`;
+    if (isSystem) return `<div style="text-align:center; font-size:0.7rem; color:var(--gold); background:rgba(201,168,76,0.08); padding:0.6rem 1rem; border-radius:4px; white-space:pre-line;">${m.text}</div>`;
     return `<div style="display:flex; flex-direction:column; align-items:${isAdmin ? 'flex-end' : 'flex-start'}; position:relative;" onmouseover="this.querySelector('.del-btn')&&(this.querySelector('.del-btn').style.opacity='1')" onmouseout="this.querySelector('.del-btn')&&(this.querySelector('.del-btn').style.opacity='0')">
-      <div style="max-width:75%; background:${isAdmin ? 'var(--blue-mid)' : '#0A1628'}; border:1px solid ${isAdmin ? 'transparent' : 'rgba(255,255,255,0.08)'}; padding:0.7rem 1rem; border-radius:4px; position:relative;">
-        <div style="font-size:0.65rem; color:${isAdmin ? 'rgba(255,255,255,0.6)' : 'var(--gold)'}; margin-bottom:0.3rem;">${isAdmin ? 'Vous' : 'Client'}</div>
-        ${m.image ? `<img src="${m.image}" style="max-width:200px; max-height:200px; object-fit:contain; display:block; margin-bottom:${m.text?'0.5rem':'0'}; cursor:pointer;" onclick="window.open(this.src,'_blank')">` : ''}
-        ${m.text ? `<div style="font-size:0.85rem; color:var(--white); line-height:1.5;">${m.text}</div>` : ''}
-        ${m.image ? `<a href="${m.image}" download="photo-commande.jpg" style="display:inline-block; margin-top:0.4rem; font-size:0.6rem; color:var(--gold); text-decoration:none; letter-spacing:0.08em; text-transform:uppercase;">⬇ Télécharger</a>` : ''}
+      <div style="max-width:75%; background:${isAdmin ? 'var(--blue-mid)' : '#0A1628'}; border:1px solid ${isAdmin ? 'transparent' : 'rgba(255,255,255,0.08)'}; padding:0.7rem 1rem; border-radius:4px;">
+        <div style="font-size:0.65rem; color:${isAdmin ? 'rgba(255,255,255,0.6)' : 'var(--gold)'}; margin-bottom:0.3rem;">${isAdmin ? 'Vous (Admin)' : 'Client'}</div>
+        ${m.image ? `<img src="${m.image}" style="max-width:200px; max-height:200px; object-fit:contain; display:block; margin-bottom:${m.text?'0.5rem':'0'}; cursor:pointer;" onclick="window.open(this.src,'_blank')"><a href="${m.image}" download="photo.jpg" style="display:inline-block; margin-top:0.3rem; font-size:0.6rem; color:var(--gold); text-decoration:none; text-transform:uppercase; letter-spacing:0.08em;">⬇ Télécharger</a>` : ''}
+        ${m.text ? `<div style="font-size:0.85rem; color:var(--white); line-height:1.6; white-space:pre-line;">${m.text}</div>` : ''}
       </div>
-      <button class="del-btn" onclick="deleteAdminMessage('${m.id}')" style="opacity:0; transition:opacity 0.2s; background:rgba(192,57,43,0.15); border:1px solid rgba(192,57,43,0.3); color:#e74c3c; font-size:0.55rem; padding:0.15rem 0.5rem; cursor:pointer; margin-top:0.2rem; font-family:'Josefin Sans',sans-serif; letter-spacing:0.08em;">🗑 Supprimer</button>
+      <div style="display:flex; align-items:center; gap:0.5rem; margin-top:0.2rem;">
+        <span style="font-size:0.6rem; color:rgba(255,255,255,0.2);">${new Date(m.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span>
+        <button class="del-btn" onclick="deleteAdminMessage('${m.id}')" style="opacity:0; transition:opacity 0.2s; background:rgba(192,57,43,0.15); border:1px solid rgba(192,57,43,0.3); color:#e74c3c; font-size:0.55rem; padding:0.15rem 0.5rem; cursor:pointer; font-family:'Josefin Sans',sans-serif;">🗑</button>
+      </div>
     </div>`;
   }).join('');
   msgsEl.scrollTop = msgsEl.scrollHeight;
@@ -3352,14 +3371,33 @@ async function loadClientOrders() {
   }
 }
 
+// Helper pour récupérer un token valide
+async function _getToken() {
+  const { data } = await _supa.auth.getSession();
+  if (data.session) return data.session.access_token;
+  // Essaie de rafraîchir la session
+  const { data: refreshed } = await _supa.auth.refreshSession();
+  return refreshed.session?.access_token || null;
+}
+
 async function openConversation(orderId) {
+  const token = await _getToken();
+  if (!token) { showPage('auth'); return; }
+
   const res = await fetch('/api/client', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'get_order', id: orderId, token: (await _supa.auth.getSession()).data.session?.access_token })
+    body: JSON.stringify({ action: 'get_order', token, id: orderId })
   });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    showToast('❌ Erreur : ' + (err.error || res.status));
+    return;
+  }
+
   const { order } = await res.json();
-  if (!order) return;
+  if (!order) { showToast('❌ Commande introuvable'); return; }
   window._currentOrder = order;
 
   document.getElementById('clientOrdersList').style.display = 'none';
@@ -3408,12 +3446,11 @@ function closeConversation() {
 }
 
 async function loadMessages(orderId) {
-  const { data: msgs } = await _supa.from('messages').select('*').eq('order_id', orderId).order('created_at', { ascending: true });
   const box = document.getElementById('convMessages');
   const o   = window._currentOrder;
   const acompte = o ? Math.ceil(o.amount * 0.5) : 0;
 
-  // Message de bienvenue fixe en haut (résumé de commande)
+  // Résumé commande fixe en haut
   const welcomeHtml = o ? `
     <div style="background:rgba(201,168,76,0.07); border:1px solid rgba(201,168,76,0.2); padding:1.2rem; border-radius:4px; margin-bottom:0.5rem;">
       <div style="font-size:0.6rem; color:var(--gold); letter-spacing:0.15em; text-transform:uppercase; margin-bottom:0.7rem;">📋 Résumé de votre commande</div>
@@ -3422,8 +3459,8 @@ async function loadMessages(orderId) {
         <b style="color:var(--white);">Format :</b> Portrait ${o.format} (${getDimensions(o.format)})<br>
         <b style="color:var(--white);">Montant total :</b> ${o.amount} $<br>
         <b style="color:var(--white);">Acompte (50%) :</b> <span style="color:var(--gold); font-weight:600;">${acompte} $</span><br>
-        <b style="color:var(--white);">Date :</b> ${o.date}<br>
-        ${o.description ? `<b style="color:var(--white);">Description :</b> ${o.description}` : ''}
+        <b style="color:var(--white);">Date :</b> ${o.date}
+        ${o.description ? `<br><b style="color:var(--white);">Description :</b> ${o.description}` : ''}
       </div>
       ${o.payment_status === 'confirmed' ? `
         <div style="margin-top:1rem; padding-top:0.8rem; border-top:1px solid rgba(201,168,76,0.2);">
@@ -3431,30 +3468,40 @@ async function loadMessages(orderId) {
         </div>` : ''}
     </div>` : '';
 
-  if (!msgs || msgs.length === 0) {
-    box.innerHTML = welcomeHtml + `
-      <div style="color:rgba(255,255,255,0.2); font-size:0.8rem; text-align:center; padding:1.5rem;">
-        Bienvenue ! Posez vos questions ici — l'artiste vous répondra rapidement.
-      </div>`;
-    return;
-  }
+  // Charge les messages via API client
+  try {
+    const session = (await _supa.auth.getSession()).data.session;
+    const res = await fetch('/api/client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get_messages', order_id: orderId, token: session?.access_token })
+    });
+    const { messages: msgs } = await res.json();
 
-  box.innerHTML = welcomeHtml + msgs.map(m => {
-    const isMe    = m.sender === 'client';
-    const isAdmin = m.sender === 'admin';
-    const isSystem = m.sender === 'system';
-    if (isSystem) return `<div style="text-align:center; font-size:0.72rem; color:var(--gold); background:rgba(201,168,76,0.07); padding:0.6rem 1rem; border-radius:4px;">${m.text}</div>`;
-    return `
-      <div style="display:flex; flex-direction:column; align-items:${isMe ? 'flex-end' : 'flex-start'};">
-        <div style="max-width:75%; background:${isMe ? 'var(--blue-mid)' : '#132238'}; padding:0.7rem 1rem; font-size:0.85rem; color:rgba(255,255,255,0.9); line-height:1.5; border-radius:2px;">
-          ${isAdmin ? '<div style="font-size:0.6rem; color:var(--gold); letter-spacing:0.1em; margin-bottom:0.3rem; text-transform:uppercase;">Élirïs\'Art</div>' : ''}
-          ${m.image ? `<img src="${m.image}" style="max-width:220px; max-height:180px; display:block; margin-bottom:${m.text?'0.5rem':'0'}; cursor:pointer; border-radius:2px;" onclick="downloadImg('${m.image}','photo-${m.id}')">` : ''}
-          ${m.text ? `<div>${m.text}</div>` : ''}
-        </div>
-        <div style="font-size:0.62rem; color:rgba(255,255,255,0.2); margin-top:0.2rem; padding:0 0.3rem;">${new Date(m.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</div>
-      </div>`;
-  }).join('');
-  box.scrollTop = box.scrollHeight;
+    if (!msgs || msgs.length === 0) {
+      box.innerHTML = welcomeHtml + `<div style="color:rgba(255,255,255,0.2); font-size:0.8rem; text-align:center; padding:1.5rem;">Bienvenue ! Posez vos questions ici.</div>`;
+      return;
+    }
+
+    box.innerHTML = welcomeHtml + msgs.map(m => {
+      const isMe     = m.sender === 'client';
+      const isAdmin  = m.sender === 'admin';
+      const isSystem = m.sender === 'system';
+      if (isSystem) return `<div style="text-align:center; font-size:0.72rem; color:var(--gold); background:rgba(201,168,76,0.07); padding:0.6rem 1rem; border-radius:4px; white-space:pre-line;">${m.text}</div>`;
+      return `
+        <div style="display:flex; flex-direction:column; align-items:${isMe ? 'flex-end' : 'flex-start'};">
+          <div style="max-width:75%; background:${isMe ? 'var(--blue-mid)' : '#132238'}; padding:0.7rem 1rem; font-size:0.85rem; color:rgba(255,255,255,0.9); line-height:1.5; border-radius:2px;">
+            ${isAdmin ? '<div style="font-size:0.6rem; color:var(--gold); letter-spacing:0.1em; margin-bottom:0.3rem; text-transform:uppercase;">Élirïs\'Art</div>' : ''}
+            ${m.image ? `<img src="${m.image}" style="max-width:220px; max-height:180px; display:block; margin-bottom:${m.text?'0.5rem':'0'}; cursor:pointer; border-radius:2px;" onclick="downloadImg('${m.image}','photo-${m.id}')">` : ''}
+            ${m.text ? `<div style="white-space:pre-line;">${m.text}</div>` : ''}
+          </div>
+          <div style="font-size:0.62rem; color:rgba(255,255,255,0.2); margin-top:0.2rem; padding:0 0.3rem;">${new Date(m.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>`;
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+  } catch(e) {
+    box.innerHTML = welcomeHtml + `<div style="color:#e74c3c; font-size:0.8rem; padding:1rem; text-align:center;">Erreur de chargement des messages.</div>`;
+  }
 }
 
 async function sendMessage() {
@@ -3462,11 +3509,12 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text || !window._currentOrder) return;
   input.value = '';
-  const session = (await _supa.auth.getSession()).data.session;
+  const token = await _getToken();
+  if (!token) { showPage('auth'); return; }
   await fetch('/api/client', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'send_message', token: session?.access_token, order_id: window._currentOrder.id, text, sender: 'client' })
+    body: JSON.stringify({ action: 'send_message', token, order_id: window._currentOrder.id, text, sender: 'client' })
   });
 }
 
@@ -3480,7 +3528,7 @@ async function sendImageMessage(input) {
   await fetch('/api/client', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'send_message', token: session?.access_token, order_id: window._currentOrder.id, image: compressed, sender: 'client' })
+    body: JSON.stringify({ action: 'send_message', token, order_id: window._currentOrder.id, image: compressed, sender: 'client' })
   });
   document.getElementById('convImgPreviewBar').style.display = 'none';
   input.value = '';
@@ -3491,14 +3539,15 @@ async function submitPayment() {
   const ref    = document.getElementById('payRef').value.trim();
   if (!ref) { alert('Entrez la référence de votre paiement.'); return; }
   if (!window._currentOrder) return;
-  const session = (await _supa.auth.getSession()).data.session;
+  const token = await _getToken();
+  if (!token) { showPage('auth'); return; }
   const acompte = Math.ceil(window._currentOrder.amount * 0.5);
   const res = await fetch('/api/client', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       action: 'submit_payment',
-      token: session?.access_token,
+      token,
       order_id: window._currentOrder.id,
       method, ref, acompte
     })
